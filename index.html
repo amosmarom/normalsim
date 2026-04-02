@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NormalSim — Central Limit Theorem Explorer</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f0f4f8; --card: #fff; --primary: #4361ee;
+      --primary-light: #eef2ff; --text: #1a202c; --muted: #718096; --border: #e2e8f0;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* Header */
+    header { background: linear-gradient(135deg,#4361ee,#7209b7); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; }
+    header h1 { font-size:1.5rem; font-weight:800; letter-spacing:-0.02em; }
+    header .subtitle { font-size:.78rem; opacity:.85; margin-top:2px; }
+    header .tagline { font-size:.75rem; opacity:.8; text-align:right; max-width:230px; line-height:1.5; }
+
+    /* Layout */
+    .container { display:grid; grid-template-columns:320px 1fr; gap:1rem; padding:1rem; max-width:1280px; margin:0 auto; }
+    @media(max-width:820px){ .container{grid-template-columns:1fr} .stats-row{grid-template-columns:repeat(2,1fr)!important} }
+
+    /* Card */
+    .card { background:var(--card); border-radius:12px; padding:1rem; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+    .card-title { font-size:.7rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.75rem; }
+
+    /* Factor cards */
+    .factor-card { display:flex; align-items:center; gap:.65rem; padding:.55rem .65rem; border:2px solid var(--border); border-radius:8px; margin-bottom:.4rem; cursor:pointer; transition:border-color .15s; user-select:none; }
+    .factor-card:hover { border-color:#cbd5e0; }
+    .factor-card.active { border-color:var(--fc); }
+    .factor-check { width:18px; height:18px; flex-shrink:0; border-radius:4px; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent; transition:all .15s; }
+    .factor-card.active .factor-check { background:var(--fc); border-color:var(--fc); color:#fff; }
+    .factor-info { flex:1; min-width:0; }
+    .factor-name { font-size:.82rem; font-weight:600; }
+    .factor-badge { display:inline-block; font-size:.63rem; padding:1px 5px; border-radius:3px; margin-top:3px; font-weight:700; background:var(--fc-bg); color:var(--fc); }
+    .factor-spark { width:52px; height:28px; flex-shrink:0; border-radius:3px; }
+
+    /* Controls */
+    .controls-section { margin-top:.8rem; padding-top:.8rem; border-top:1px solid var(--border); }
+    .ctrl-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:.2rem; }
+    .ctrl-label { font-size:.82rem; font-weight:500; }
+    .ctrl-value { font-size:.82rem; color:var(--primary); font-weight:700; }
+    input[type=range] { width:100%; margin:.3rem 0 .8rem; accent-color:var(--primary); }
+
+    .btn-run { width:100%; padding:.65rem 1rem; background:var(--primary); color:#fff; border:none; border-radius:8px; font-size:.88rem; font-weight:700; cursor:pointer; letter-spacing:.02em; transition:background .2s, transform .1s; }
+    .btn-run:hover { filter:brightness(1.1); }
+    .btn-run:active { transform:scale(.98); }
+    .btn-run:disabled { background:#a0aec0; cursor:not-allowed; filter:none; transform:none; }
+
+    .clt-insight { margin-top:.75rem; padding:.65rem .8rem; background:var(--primary-light); color:#2d3a9a; border-left:3px solid var(--primary); border-radius:0 8px 8px 0; font-size:.76rem; line-height:1.55; }
+
+    /* Chart panel */
+    .chart-panel { display:flex; flex-direction:column; gap:1rem; }
+    .chart-wrap { position:relative; height:360px; }
+    .empty-state { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.4rem; color:var(--muted); }
+    .empty-state .emo { font-size:2.8rem; }
+    .empty-state p { font-size:.85rem; }
+    .empty-state small { font-size:.74rem; }
+    #mainChart { display:none; width:100%!important; height:100%!important; }
+
+    /* Progress */
+    .prog-wrap { display:none; align-items:center; gap:.5rem; margin-bottom:.6rem; }
+    .prog-bar { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+    .prog-fill { height:100%; background:var(--primary); border-radius:2px; width:0%; transition:width .05s linear; }
+    .prog-text { font-size:.72rem; color:var(--muted); white-space:nowrap; min-width:130px; text-align:right; }
+
+    /* Stats */
+    .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem; }
+    .stat-card { background:var(--card); border-radius:10px; padding:.75rem; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+    .stat-label { font-size:.66rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
+    .stat-value { font-size:1.25rem; font-weight:800; color:var(--primary); margin-top:.2rem; transition:color .3s; }
+    .stat-sub { font-size:.67rem; color:var(--muted); margin-top:2px; }
+
+    /* Box plot */
+    #boxPlotCard { display:none; }
+    #boxPlotCanvas { width:100%; display:block; }
+    .bp-legend { display:flex; gap:1.2rem; font-size:.72rem; color:var(--muted); margin-bottom:.5rem; flex-wrap:wrap; align-items:center; }
+    .bp-legend span { display:flex; align-items:center; gap:.35rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>NormalSim</h1>
+    <div class="subtitle">Central Limit Theorem Explorer</div>
+  </div>
+  <div class="tagline">Activate exam factors → Run simulation<br>Watch their sum converge to a bell curve</div>
+</header>
+
+<div class="container">
+  <!-- ── Left ── -->
+  <div>
+    <div class="card">
+      <div class="card-title">Exam Factors (pick 1–7)</div>
+      <div id="factorList"></div>
+      <div class="controls-section">
+        <div class="ctrl-row">
+          <span class="ctrl-label">Number of Students</span>
+          <span class="ctrl-value" id="studentLabel">500</span>
+        </div>
+        <input type="range" id="studentSlider" min="50" max="5000" step="50" value="500"
+          oninput="document.getElementById('studentLabel').textContent=Number(this.value).toLocaleString()">
+        <button class="btn-run" id="runBtn" onclick="handleRunBtn()" disabled>▶ Run Simulation</button>
+        <div class="clt-insight" id="cltInsight">Select at least one factor to begin.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right ── -->
+  <div class="chart-panel">
+    <div class="card">
+      <div class="card-title" id="chartTitle">Grade Distribution</div>
+      <div class="prog-wrap" id="progWrap">
+        <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+        <div class="prog-text" id="progText"></div>
+      </div>
+      <div class="chart-wrap">
+        <div class="empty-state" id="emptyState">
+          <div class="emo">📊</div>
+          <p>No simulation yet</p>
+          <small>Activate some factors and press Run</small>
+        </div>
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Mean Grade</div>
+        <div class="stat-value" id="statMean">—</div>
+        <div class="stat-sub" id="statMeanSub">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Std Deviation</div>
+        <div class="stat-value" id="statStd">—</div>
+        <div class="stat-sub" id="statStdSub">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Skewness</div>
+        <div class="stat-value" id="statSkew">—</div>
+        <div class="stat-sub" id="statSkewSub">&nbsp;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Distribution Shape</div>
+        <div class="stat-value" id="statShape" style="font-size:.88rem">—</div>
+        <div class="stat-sub" id="statShapeSub">&nbsp;</div>
+      </div>
+    </div>
+
+    <!-- Box plot -->
+    <div class="card" id="boxPlotCard">
+      <div class="card-title">Box Plot</div>
+      <div class="bp-legend">
+        <span>
+          <svg width="16" height="12"><rect x="1" y="1" width="14" height="10" fill="rgba(67,97,238,.25)" stroke="#4361ee" stroke-width="1.5" rx="2"/></svg>
+          IQR Box (Q1–Q3)
+        </span>
+        <span>
+          <svg width="12" height="12"><line x1="6" y1="0" x2="6" y2="12" stroke="#e74c3c" stroke-width="2.5"/></svg>
+          Median
+        </span>
+        <span>
+          <svg width="14" height="12"><polygon points="7,0 13,6 7,12 1,6" fill="#27ae60"/></svg>
+          Mean
+        </span>
+        <span>
+          <svg width="12" height="12"><circle cx="6" cy="6" r="4" fill="rgba(231,76,60,.55)"/></svg>
+          Outliers (±1.5 IQR)
+        </span>
+      </div>
+      <canvas id="boxPlotCanvas" height="130"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  DISTRIBUTIONS
+// ══════════════════════════════════════════════════════
+
+function gaussRandom(mu = 0, sigma = 1) {
+  const u = Math.max(1e-10, Math.random());
+  return mu + sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
+}
+const clamp01 = x => Math.max(0, Math.min(1, x));
+
+const FACTORS = [
+  {
+    name: 'Study Hours', desc: 'Time spent preparing for the exam',
+    shape: 'Right-Skewed', color: '#e74c3c',
+    sample: () => Math.random() * Math.random()           // product of 2 uniforms
+  },
+  {
+    name: 'Natural Aptitude', desc: 'Innate academic ability of the student',
+    shape: 'Normal', color: '#3498db',
+    sample: () => clamp01(gaussRandom(0.5, 0.15))
+  },
+  {
+    name: 'Attendance Rate', desc: 'Regularity of class attendance',
+    shape: 'Left-Skewed', color: '#27ae60',
+    sample: () => Math.sqrt(Math.random())                // √U → PDF = 2x, clusters near 1
+  },
+  {
+    name: 'Sleep Quality', desc: 'Sleep quality the night before the exam',
+    shape: 'Uniform', color: '#f39c12',
+    sample: () => Math.random()
+  },
+  {
+    name: 'Test Anxiety', desc: 'Calm students score high; anxious students score low',
+    shape: 'Bimodal', color: '#9b59b6',
+    sample: () => Math.random() < 0.48
+      ? clamp01(gaussRandom(0.22, 0.09))
+      : clamp01(gaussRandom(0.78, 0.09))
+  },
+  {
+    name: 'Prior Knowledge', desc: "Background from prerequisites — either you have it or you don't",
+    shape: 'U-Shaped', color: '#16a085',
+    sample: () => Math.random() < 0.45
+      ? clamp01(gaussRandom(0.12, 0.08))
+      : clamp01(gaussRandom(0.88, 0.08))
+  },
+  {
+    name: 'Luck Factor', desc: 'Random events on exam day — familiar questions, good guesses',
+    shape: 'Triangular', color: '#d35400',
+    sample: () => { const r = Math.random(), c = 0.6; return r < c ? Math.sqrt(r * c) : 1 - Math.sqrt((1 - r) * (1 - c)); }
+  }
+];
+
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+
+const active = new Set();
+let mainChart = null;
+let anim = { running: false, grades: [], targetN: 0, factors: [], raf: null };
+
+// ══════════════════════════════════════════════════════
+//  MATH / STATS
+// ══════════════════════════════════════════════════════
+
+function computeStats(arr) {
+  const n = arr.length;
+  let sum = 0;
+  for (const x of arr) sum += x;
+  const mu = sum / n;
+  let sse = 0, sk3 = 0;
+  for (const x of arr) { const d = x - mu; sse += d * d; sk3 += d * d * d; }
+  const s = Math.sqrt(sse / n);
+  return { mu, s, skew: s > 1e-10 ? sk3 / (n * s * s * s) : 0 };
+}
+
+function quantile(sorted, p) {
+  return sorted[Math.min(Math.floor(sorted.length * p), sorted.length - 1)];
+}
+
+function silverman(arr) {
+  const n = arr.length, { s } = computeStats(arr);
+  const srt = [...arr].sort((a, b) => a - b);
+  const iqr = (quantile(srt, 0.75) - quantile(srt, 0.25)) / 1.34;
+  return 1.06 * (Math.min(s, iqr) || s || 1) * Math.pow(n, -0.2);
+}
+
+const gaussK = u => Math.exp(-0.5 * u * u) / Math.sqrt(2 * Math.PI);
+
+// ══════════════════════════════════════════════════════
+//  HISTOGRAM / KDE / NORMAL REFERENCE
+// ══════════════════════════════════════════════════════
+
+const BIN_N = 20, BIN_W = 5;
+const BIN_MP = Array.from({ length: BIN_N }, (_, i) => i * BIN_W + BIN_W / 2);
+const BIN_LB = Array.from({ length: BIN_N }, (_, i) => String(i * BIN_W));
+
+function histDensity(grades) {
+  const counts = new Array(BIN_N).fill(0);
+  for (const g of grades) { const b = Math.min(Math.floor(g / BIN_W), BIN_N - 1); if (b >= 0) counts[b]++; }
+  return counts.map(c => c / (grades.length * BIN_W));
+}
+
+function kdeDensity(grades, bw) {
+  return BIN_MP.map(x => grades.reduce((s, xi) => s + gaussK((x - xi) / bw), 0) / (grades.length * bw));
+}
+
+function normalDens(mu, sig) {
+  return BIN_MP.map(x => Math.exp(-0.5 * ((x - mu) / sig) ** 2) / (sig * Math.sqrt(2 * Math.PI)));
+}
+
+// ══════════════════════════════════════════════════════
+//  CHART (init once, update in-place)
+// ══════════════════════════════════════════════════════
+
+function initChart() {
+  if (mainChart) { mainChart.destroy(); mainChart = null; }
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  mainChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: BIN_LB,
+      datasets: [
+        { label: 'Histogram (density)', data: new Array(BIN_N).fill(0), backgroundColor: 'rgba(67,97,238,.40)', borderColor: 'rgba(67,97,238,.75)', borderWidth: 1, borderRadius: 2, order: 3 },
+        { label: 'KDE', type: 'line', data: new Array(BIN_N).fill(0), borderColor: '#e74c3c', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.45, order: 1 },
+        { label: 'Normal reference (same μ, σ)', type: 'line', data: new Array(BIN_N).fill(0), borderColor: '#27ae60', borderWidth: 2, borderDash: [7, 4], pointRadius: 0, fill: false, tension: 0.45, order: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { display: true, position: 'top', labels: { usePointStyle: true, font: { size: 11 }, padding: 14 } },
+        tooltip: { callbacks: { title: ctx => `Grade ${ctx[0].label}–${+ctx[0].label + BIN_W}`, label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}` } }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Grade (0–100)', font: { size: 11 } }, ticks: { maxTicksLimit: 11 } },
+        y: { title: { display: true, text: 'Density', font: { size: 11 } }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function updateChartData(grades) {
+  if (!mainChart || grades.length < 2) return;
+  const bw = silverman(grades);
+  const { mu, s } = computeStats(grades);
+  mainChart.data.datasets[0].data = histDensity(grades);
+  mainChart.data.datasets[1].data = kdeDensity(grades, bw);
+  mainChart.data.datasets[2].data = s > 0.1 ? normalDens(mu, s) : new Array(BIN_N).fill(0);
+  mainChart.update('none');
+}
+
+// ══════════════════════════════════════════════════════
+//  BOX PLOT
+// ══════════════════════════════════════════════════════
+
+function renderBoxPlot(grades) {
+  if (grades.length < 5) return;
+  const canvas = document.getElementById('boxPlotCanvas');
+  canvas.width = canvas.offsetWidth || 640;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const sorted = [...grades].sort((a, b) => a - b);
+  const q1  = quantile(sorted, 0.25);
+  const med = quantile(sorted, 0.50);
+  const q3  = quantile(sorted, 0.75);
+  const iqr = q3 - q1;
+  const wLo = Math.max(0,   q1 - 1.5 * iqr);
+  const wHi = Math.min(100, q3 + 1.5 * iqr);
+  const { mu } = computeStats(grades);
+
+  const PAD_L = 50, PAD_R = 30, PAD_T = 38, PAD_B = 38;
+  const plotW = W - PAD_L - PAD_R;
+  const sx = v => PAD_L + (v / 100) * plotW;
+  const MID  = PAD_T + (H - PAD_T - PAD_B) / 2;
+  const BH   = Math.min(34, (H - PAD_T - PAD_B) * 0.52);
+
+  // Axis line
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD_L, MID + BH / 2 + 14); ctx.lineTo(W - PAD_R, MID + BH / 2 + 14); ctx.stroke();
+
+  // Axis ticks + labels
+  ctx.fillStyle = '#a0aec0'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+  [0, 20, 40, 60, 80, 100].forEach(v => {
+    const x = sx(v);
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, MID + BH / 2 + 12); ctx.lineTo(x, MID + BH / 2 + 16); ctx.stroke();
+    ctx.fillText(v, x, MID + BH / 2 + 26);
+  });
+
+  // Outlier dots (max 300 for perf)
+  ctx.fillStyle = 'rgba(231,76,60,.5)';
+  let drawn = 0;
+  for (const g of grades) {
+    if ((g < wLo || g > wHi) && drawn < 300) {
+      ctx.beginPath(); ctx.arc(sx(g), MID, 3, 0, Math.PI * 2); ctx.fill();
+      drawn++;
+    }
+  }
+
+  // Whiskers
+  ctx.strokeStyle = '#4361ee'; ctx.lineWidth = 2;
+  [[wLo, q1], [q3, wHi]].forEach(([a, b]) => {
+    ctx.beginPath(); ctx.moveTo(sx(a), MID); ctx.lineTo(sx(b), MID); ctx.stroke();
+  });
+  [wLo, wHi].forEach(v => {
+    ctx.beginPath(); ctx.moveTo(sx(v), MID - BH * 0.3); ctx.lineTo(sx(v), MID + BH * 0.3); ctx.stroke();
+  });
+
+  // IQR box
+  ctx.fillStyle = 'rgba(67,97,238,.22)'; ctx.strokeStyle = '#4361ee'; ctx.lineWidth = 2;
+  const bx = sx(q1), bw = sx(q3) - sx(q1);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx, MID - BH / 2, bw, BH, 3);
+  else ctx.rect(bx, MID - BH / 2, bw, BH);
+  ctx.fill(); ctx.stroke();
+
+  // Median line
+  ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(sx(med), MID - BH / 2); ctx.lineTo(sx(med), MID + BH / 2); ctx.stroke();
+
+  // Mean diamond
+  const mx = sx(mu), sz = 7;
+  ctx.fillStyle = '#27ae60';
+  ctx.beginPath(); ctx.moveTo(mx, MID - sz); ctx.lineTo(mx + sz, MID); ctx.lineTo(mx, MID + sz); ctx.lineTo(mx - sz, MID); ctx.closePath(); ctx.fill();
+
+  // Value labels above box
+  ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+
+  // Q1, Q3
+  ctx.fillStyle = '#4361ee';
+  ctx.fillText(`Q1 ${q1.toFixed(1)}`, sx(q1), MID - BH / 2 - 6);
+  ctx.fillText(`Q3 ${q3.toFixed(1)}`, sx(q3), MID - BH / 2 - 6);
+
+  // Median — offset higher to avoid Q1/Q3 overlap
+  ctx.fillStyle = '#e74c3c';
+  const medX = sx(med), q1X = sx(q1), q3X = sx(q3);
+  const medRow = (Math.abs(medX - q1X) < 34 || Math.abs(medX - q3X) < 34) ? MID - BH / 2 - 20 : MID - BH / 2 - 6;
+  ctx.fillText(`Med ${med.toFixed(1)}`, medX, medRow);
+
+  // Mean label below axis
+  ctx.fillStyle = '#27ae60';
+  ctx.fillText(`Mean ${mu.toFixed(1)}`, sx(mu), MID + BH / 2 + 36);
+
+  // Whisker end values
+  ctx.fillStyle = '#a0aec0'; ctx.font = '9px system-ui';
+  ctx.fillText(wLo.toFixed(0), sx(wLo), MID - BH * 0.3 - 5);
+  ctx.fillText(wHi.toFixed(0), sx(wHi), MID - BH * 0.3 - 5);
+}
+
+// ══════════════════════════════════════════════════════
+//  ANIMATION
+// ══════════════════════════════════════════════════════
+
+function handleRunBtn() {
+  if (anim.running) { stopAnim(); return; }
+  startAnim();
+}
+
+function startAnim() {
+  if (active.size === 0) return;
+
+  anim = {
+    running: true,
+    grades: [],
+    targetN: parseInt(document.getElementById('studentSlider').value, 10),
+    factors: [...active].map(i => FACTORS[i]),
+    raf: null
+  };
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('mainChart').style.display  = 'block';
+  document.getElementById('boxPlotCard').style.display = 'block';
+  document.getElementById('progWrap').style.display   = 'flex';
+
+  const btn = document.getElementById('runBtn');
+  btn.textContent = '⬛ Stop';
+  btn.style.background = '#c53030';
+
+  initChart();
+  anim.raf = requestAnimationFrame(animStep);
+}
+
+function animStep() {
+  if (!anim.running) return;
+  const { grades, targetN, factors } = anim;
+
+  const remaining = targetN - grades.length;
+  if (remaining <= 0) { finalizeAnim(); return; }
+
+  // Adaptive batch: ~120 frames total regardless of N
+  const batch = Math.min(Math.max(1, Math.ceil(targetN / 120)), remaining);
+  for (let i = 0; i < batch; i++) {
+    let sum = 0;
+    for (const f of factors) sum += f.sample();
+    grades.push((sum / factors.length) * 100);
+  }
+
+  // Update visuals
+  updateChartData(grades);
+  renderBoxPlot(grades);
+
+  // Stats (update every ~2% to save CPU on large N)
+  const statsInterval = Math.max(1, Math.ceil(targetN * 0.02));
+  if (grades.length % statsInterval < batch || grades.length === targetN) {
+    const { mu, s, skew } = computeStats(grades);
+    updateStats(mu, s, skew, factors.length);
+  }
+
+  // Progress
+  const pct = grades.length / targetN;
+  document.getElementById('progFill').style.width = (pct * 100).toFixed(1) + '%';
+  document.getElementById('progText').textContent  = `${grades.length.toLocaleString()} / ${targetN.toLocaleString()} students`;
+  document.getElementById('chartTitle').textContent = `Grade Distribution — generating… ${grades.length.toLocaleString()} / ${targetN.toLocaleString()}`;
+
+  anim.raf = requestAnimationFrame(animStep);
+}
+
+function stopAnim() {
+  if (anim.raf) cancelAnimationFrame(anim.raf);
+  anim.running = false;
+  finalizeAnim();
+}
+
+function finalizeAnim() {
+  anim.running = false;
+  const { grades, factors } = anim;
+
+  if (grades.length >= 2) {
+    updateChartData(grades);
+    renderBoxPlot(grades);
+    const { mu, s, skew } = computeStats(grades);
+    updateStats(mu, s, skew, factors.length);
+    document.getElementById('chartTitle').textContent =
+      `Grade Distribution — ${grades.length.toLocaleString()} students · ${factors.length} factor${factors.length > 1 ? 's' : ''} active`;
+  }
+
+  document.getElementById('progWrap').style.display = 'none';
+  const btn = document.getElementById('runBtn');
+  btn.textContent = '▶ Run Simulation';
+  btn.style.background = '';
+}
+
+// ══════════════════════════════════════════════════════
+//  STATS PANEL
+// ══════════════════════════════════════════════════════
+
+function updateStats(mu, s, skew, nFactors) {
+  const abs = Math.abs(skew);
+  let shape, shapeSub, skewColor;
+
+  if (nFactors === 1) {
+    shape = FACTORS[[...active][0]].shape; shapeSub = '1 factor only'; skewColor = '#e67e22';
+  } else if (abs < 0.12) {
+    shape = 'Normal ✓'; shapeSub = 'CLT achieved!'; skewColor = '#27ae60';
+  } else if (abs < 0.35) {
+    shape = 'Near-Normal'; shapeSub = 'Almost there'; skewColor = '#e67e22';
+  } else {
+    shape = skew > 0 ? 'Right-Skewed' : 'Left-Skewed'; shapeSub = 'Add more factors'; skewColor = '#e53e3e';
+  }
+
+  document.getElementById('statMean').textContent    = mu.toFixed(1);
+  document.getElementById('statMeanSub').textContent = 'out of 100';
+  document.getElementById('statStd').textContent     = s.toFixed(1);
+  document.getElementById('statStdSub').textContent  = 'grade points';
+
+  const skewEl = document.getElementById('statSkew');
+  skewEl.textContent = skew.toFixed(3); skewEl.style.color = skewColor;
+  document.getElementById('statSkewSub').textContent = skew > 0.05 ? 'right tail' : skew < -0.05 ? 'left tail' : 'symmetric';
+
+  document.getElementById('statShape').textContent    = shape;
+  document.getElementById('statShapeSub').textContent = shapeSub;
+}
+
+// ══════════════════════════════════════════════════════
+//  CLT INSIGHT TEXT
+// ══════════════════════════════════════════════════════
+
+const INSIGHTS = [
+  () => 'Select at least one factor to begin.',
+  idx => `With <strong>1 factor</strong>, the distribution directly shows <strong>${FACTORS[idx].name}</strong>'s shape — <strong>${FACTORS[idx].shape}</strong>. The CLT needs multiple independent factors to take effect.`,
+  () => `With <strong>2 factors</strong>, the sum begins to smooth out, but the original shapes still dominate.`,
+  () => `With <strong>3 factors</strong>, symmetry is emerging and tails are softening. Watch the bell curve begin to appear!`,
+  () => `With <strong>4 factors</strong>, the distribution is clearly more bell-shaped. The CLT is working — regardless of each factor's individual shape.`,
+  () => `With <strong>5 factors</strong>, the histogram closely matches the green dashed normal reference.`,
+  () => `With <strong>6 factors</strong>, the bell curve is nearly perfect. Notice how the red KDE hugs the green dashed curve.`,
+  () => `With <strong>all 7 factors</strong>, the distribution is essentially normal — regardless of the original shapes. This is the <strong>Central Limit Theorem</strong>!`
+];
+
+function updateInsight() {
+  const n = active.size, el = document.getElementById('cltInsight');
+  el.innerHTML = n === 0 ? INSIGHTS[0]() : n === 1 ? INSIGHTS[1]([...active][0]) : INSIGHTS[Math.min(n, 7)]();
+}
+
+// ══════════════════════════════════════════════════════
+//  FACTOR CARDS + SPARKLINES
+// ══════════════════════════════════════════════════════
+
+function hexToRgb(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(','); }
+
+function drawSparkline(canvas, factor) {
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const BINS = 14, counts = new Array(BINS).fill(0);
+  for (let i = 0; i < 600; i++) {
+    const b = Math.min(Math.floor(factor.sample() * BINS), BINS - 1);
+    counts[b]++;
+  }
+  const maxC = Math.max(...counts), bw = W / BINS;
+  ctx.fillStyle = factor.color + 'bb';
+  for (let i = 0; i < BINS; i++) {
+    const bh = (counts[i] / maxC) * (H - 1);
+    ctx.fillRect(i * bw + 0.5, H - bh, bw - 1, bh);
+  }
+}
+
+function renderFactorCards() {
+  const list = document.getElementById('factorList');
+  FACTORS.forEach((f, i) => {
+    const card = document.createElement('div');
+    card.className = 'factor-card';
+    card.style.setProperty('--fc', f.color);
+    card.style.setProperty('--fc-bg', `rgba(${hexToRgb(f.color)},.1)`);
+    card.title = f.desc;
+    card.innerHTML = `
+      <div class="factor-check">✓</div>
+      <div class="factor-info">
+        <div class="factor-name">${f.name}</div>
+        <span class="factor-badge">${f.shape}</span>
+      </div>
+      <canvas class="factor-spark" width="52" height="28"></canvas>
+    `;
+    card.addEventListener('click', () => {
+      if (active.has(i)) { active.delete(i); card.classList.remove('active'); }
+      else               { active.add(i);    card.classList.add('active'); }
+      document.getElementById('runBtn').disabled = active.size === 0;
+      updateInsight();
+    });
+    list.appendChild(card);
+    drawSparkline(card.querySelector('canvas'), f);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+
+renderFactorCards();
+updateInsight();
+</script>
+</body>
+</html>
