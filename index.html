@@ -102,7 +102,7 @@
           <span class="ctrl-label">Number of Students</span>
           <span class="ctrl-value" id="studentLabel">500</span>
         </div>
-        <input type="range" id="studentSlider" min="50" max="5000" step="50" value="500"
+        <input type="range" id="studentSlider" min="10" max="5000" step="10" value="500"
           oninput="document.getElementById('studentLabel').textContent=Number(this.value).toLocaleString()">
         <button class="btn-run" id="runBtn" onclick="handleRunBtn()" disabled>▶ Run Simulation</button>
         <div class="clt-insight" id="cltInsight">Select at least one factor to begin.</div>
@@ -236,7 +236,8 @@ const FACTORS = [
 
 const active = new Set();
 let mainChart = null;
-let anim = { running: false, grades: [], targetN: 0, factors: [], raf: null };
+let anim = { running: false, grades: [], targetN: 0, factors: [], timer: null, ticksDone: 0, accum: 0 };
+const SIM_TICKS = 200; // 200 × 100ms = 20 seconds
 
 // ══════════════════════════════════════════════════════
 //  MATH / STATS
@@ -441,12 +442,13 @@ function handleRunBtn() {
 function startAnim() {
   if (active.size === 0) return;
 
+  const targetN = parseInt(document.getElementById('studentSlider').value, 10);
   anim = {
     running: true,
     grades: [],
-    targetN: parseInt(document.getElementById('studentSlider').value, 10),
+    targetN,
     factors: [...active].map(i => FACTORS[i]),
-    raf: null
+    timer: null, ticksDone: 0, accum: 0,
   };
 
   document.getElementById('emptyState').style.display = 'none';
@@ -459,51 +461,44 @@ function startAnim() {
   btn.style.background = '#c53030';
 
   initChart();
-  anim.raf = requestAnimationFrame(animStep);
-}
 
-function animStep() {
-  if (!anim.running) return;
-  const { grades, targetN, factors } = anim;
+  const perTick = targetN / SIM_TICKS;
+  anim.timer = setInterval(() => {
+    anim.accum += perTick;
+    const toAdd = Math.floor(anim.accum);
+    anim.accum -= toAdd;
+    for (let i = 0; i < toAdd; i++) {
+      let sum = 0;
+      for (const f of anim.factors) sum += f.sample();
+      anim.grades.push((sum / anim.factors.length) * 100);
+    }
+    anim.ticksDone++;
 
-  const remaining = targetN - grades.length;
-  if (remaining <= 0) { finalizeAnim(); return; }
+    if (anim.grades.length >= 2) {
+      updateChartData(anim.grades);
+      renderBoxPlot(anim.grades);
+      const { mu, s, skew } = computeStats(anim.grades);
+      updateStats(mu, s, skew, anim.factors.length);
+    }
 
-  // Adaptive batch: ~120 frames total regardless of N
-  const batch = Math.min(Math.max(1, Math.ceil(targetN / 120)), remaining);
-  for (let i = 0; i < batch; i++) {
-    let sum = 0;
-    for (const f of factors) sum += f.sample();
-    grades.push((sum / factors.length) * 100);
-  }
+    const pct = anim.ticksDone / SIM_TICKS;
+    const secsLeft = Math.ceil((SIM_TICKS - anim.ticksDone) * 0.1);
+    document.getElementById('progFill').style.width = (pct * 100).toFixed(1) + '%';
+    document.getElementById('progText').textContent = `${anim.grades.length.toLocaleString()} / ${targetN.toLocaleString()} students · ${secsLeft}s left`;
+    document.getElementById('chartTitle').textContent = `Grade Distribution — generating… ${anim.grades.length.toLocaleString()} / ${targetN.toLocaleString()}`;
 
-  // Update visuals
-  updateChartData(grades);
-  renderBoxPlot(grades);
-
-  // Stats (update every ~2% to save CPU on large N)
-  const statsInterval = Math.max(1, Math.ceil(targetN * 0.02));
-  if (grades.length % statsInterval < batch || grades.length === targetN) {
-    const { mu, s, skew } = computeStats(grades);
-    updateStats(mu, s, skew, factors.length);
-  }
-
-  // Progress
-  const pct = grades.length / targetN;
-  document.getElementById('progFill').style.width = (pct * 100).toFixed(1) + '%';
-  document.getElementById('progText').textContent  = `${grades.length.toLocaleString()} / ${targetN.toLocaleString()} students`;
-  document.getElementById('chartTitle').textContent = `Grade Distribution — generating… ${grades.length.toLocaleString()} / ${targetN.toLocaleString()}`;
-
-  anim.raf = requestAnimationFrame(animStep);
+    if (anim.ticksDone >= SIM_TICKS) finalizeAnim();
+  }, 100);
 }
 
 function stopAnim() {
-  if (anim.raf) cancelAnimationFrame(anim.raf);
+  if (anim.timer) { clearInterval(anim.timer); anim.timer = null; }
   anim.running = false;
   finalizeAnim();
 }
 
 function finalizeAnim() {
+  if (anim.timer) { clearInterval(anim.timer); anim.timer = null; }
   anim.running = false;
   const { grades, factors } = anim;
 
