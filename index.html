@@ -79,6 +79,33 @@
     #boxPlotCanvas { width:100%; display:block; }
     .bp-legend { display:flex; gap:1.2rem; font-size:.72rem; color:var(--muted); margin-bottom:.5rem; flex-wrap:wrap; align-items:center; }
     .bp-legend span { display:flex; align-items:center; gap:.35rem; }
+
+    /* ── Teaching Aid ── */
+    .aid-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; flex-wrap:wrap; gap:.5rem; }
+    .aid-tabs { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .aid-tab { padding:.3rem .7rem; border:2px solid var(--border); border-radius:20px; cursor:pointer; font-size:.76rem; font-weight:600; color:var(--muted); background:#fff; transition:all .15s; }
+    .aid-tab:hover { border-color:#cbd5e0; color:var(--text); }
+    .aid-tab.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .aid-ctrl { display:flex; align-items:center; gap:.5rem; margin-bottom:.6rem; flex-wrap:wrap; }
+    .aid-btn { padding:.3rem .7rem; border:2px solid var(--border); border-radius:8px; cursor:pointer; font-size:.76rem; font-weight:600; background:#fff; color:var(--text); transition:all .15s; }
+    .aid-btn:hover { border-color:#94a3b8; }
+    .aid-btn.primary { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .aid-canvas { width:100%; display:block; }
+    /* Cards */
+    .card-deck { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:.65rem; }
+    .fc-wrap { perspective:600px; cursor:pointer; }
+    .fc-inner { position:relative; width:108px; height:148px; transition:transform .5s; transform-style:preserve-3d; }
+    .fc-wrap.flipped .fc-inner { transform:rotateY(180deg); }
+    .fc-face, .fc-back { position:absolute; inset:0; border-radius:10px; backface-visibility:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:.45rem; }
+    .fc-face { background:linear-gradient(135deg,#4361ee,#7209b7); color:#fff; font-size:2.2rem; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+    .fc-back { transform:rotateY(180deg); background:#fff; border:2.5px solid; box-shadow:0 2px 6px rgba(0,0,0,.08); gap:.18rem; }
+    .fc-nm { font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; text-align:center; line-height:1.2; }
+    .fc-val { font-size:1.3rem; font-weight:900; }
+    .fc-bar { width:78%; height:5px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin:.1rem 0; }
+    .fc-fill { height:100%; border-radius:3px; }
+    .fc-sh  { font-size:.6rem; color:#718096; }
+    .fc-pts { font-size:.64rem; color:#718096; }
+    .fc-total { text-align:center; padding:.55rem; background:var(--primary-light); border-radius:8px; font-size:.85rem; font-weight:700; color:#2d3a9a; }
   </style>
 </head>
 <body>
@@ -175,6 +202,43 @@
       <canvas id="boxPlotCanvas" height="130"></canvas>
     </div>
   </div>
+
+  <!-- Teaching Aid -->
+  <div class="card" id="teachingAidCard" style="display:none">
+    <div class="aid-header">
+      <div class="card-title" style="margin:0">Teaching Aid — CLT in Action</div>
+      <div class="aid-tabs">
+        <button class="aid-tab active" data-mode="build" onclick="setAid('build')">📊 Build-a-Grade</button>
+        <button class="aid-tab" data-mode="spag"  onclick="setAid('spag')">〰 Spaghetti Paths</button>
+        <button class="aid-tab" data-mode="cards" onclick="setAid('cards')">🃏 Factor Cards</button>
+      </div>
+    </div>
+    <!-- Build-a-Grade -->
+    <div id="aidBuild">
+      <div class="aid-ctrl">
+        <button class="aid-btn primary" onclick="newBuildStudent()">🎲 New Student</button>
+        <button class="aid-btn" onclick="replayBuild()">↺ Replay</button>
+      </div>
+      <canvas id="buildCanvas" class="aid-canvas" height="130"></canvas>
+    </div>
+    <!-- Spaghetti Paths -->
+    <div id="aidSpag" style="display:none">
+      <div class="aid-ctrl">
+        <button class="aid-btn primary" onclick="startSpaghetti()">▶ Animate</button>
+      </div>
+      <canvas id="spagCanvas" class="aid-canvas" height="300"></canvas>
+    </div>
+    <!-- Factor Cards -->
+    <div id="aidCards" style="display:none">
+      <div class="aid-ctrl">
+        <button class="aid-btn primary" onclick="newCardDeal()">🎲 New Student</button>
+        <button class="aid-btn" onclick="flipAllCards()">👁 Reveal All</button>
+      </div>
+      <div class="card-deck" id="cardDeck"></div>
+      <div class="fc-total" id="cardTotal">—</div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -515,6 +579,7 @@ function finalizeAnim() {
   const btn = document.getElementById('runBtn');
   btn.textContent = '▶ Run Simulation';
   btn.style.background = '';
+  showTeachingAid();
 }
 
 // ══════════════════════════════════════════════════════
@@ -566,6 +631,279 @@ const INSIGHTS = [
 function updateInsight() {
   const n = active.size, el = document.getElementById('cltInsight');
   el.innerHTML = n === 0 ? INSIGHTS[0]() : n === 1 ? INSIGHTS[1]([...active][0]) : INSIGHTS[Math.min(n, 7)]();
+}
+
+// ══════════════════════════════════════════════════════
+//  TEACHING AID
+// ══════════════════════════════════════════════════════
+
+let aidMode = 'build';
+function getActiveFactors() { return [...active].map(i => FACTORS[i]); }
+
+function setAid(mode) {
+  aidMode = mode;
+  document.querySelectorAll('.aid-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.getElementById('aidBuild').style.display = mode === 'build' ? '' : 'none';
+  document.getElementById('aidSpag').style.display  = mode === 'spag'  ? '' : 'none';
+  document.getElementById('aidCards').style.display = mode === 'cards' ? '' : 'none';
+  setTimeout(() => {
+    if (mode === 'build') newBuildStudent();
+    if (mode === 'spag')  startSpaghetti();
+    if (mode === 'cards') newCardDeal();
+  }, 50);
+}
+
+function showTeachingAid() {
+  document.getElementById('teachingAidCard').style.display = 'block';
+  setTimeout(() => {
+    if (aidMode === 'build') newBuildStudent();
+    if (aidMode === 'spag')  startSpaghetti();
+    if (aidMode === 'cards') newCardDeal();
+  }, 100);
+}
+
+// ── Build-a-Grade ─────────────────────────────────────
+let buildSt = null, buildTimer = null;
+
+function newBuildStudent() {
+  if (buildTimer) { clearInterval(buildTimer); buildTimer = null; }
+  const factors = getActiveFactors();
+  if (!factors.length) return;
+  buildSt = { factors, values: factors.map(f => f.sample()), shown: 0 };
+  buildSt.total = (buildSt.values.reduce((a, b) => a + b, 0) / factors.length) * 100;
+  animateBuild();
+}
+
+function replayBuild() {
+  if (!buildSt) { newBuildStudent(); return; }
+  if (buildTimer) { clearInterval(buildTimer); buildTimer = null; }
+  animateBuild();
+}
+
+function animateBuild() {
+  buildSt.shown = 0;
+  drawBuild();
+  buildTimer = setInterval(() => {
+    buildSt.shown++;
+    drawBuild();
+    if (buildSt.shown >= buildSt.factors.length) { clearInterval(buildTimer); buildTimer = null; }
+  }, 600);
+}
+
+function drawBuild() {
+  const canvas = document.getElementById('buildCanvas');
+  canvas.width = canvas.offsetWidth || 700;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  if (!buildSt) return;
+  const { factors, values, shown, total } = buildSt;
+  const n = factors.length;
+  const PAD = 16, BAR_H = 36, BAR_Y = 44, barW = W - PAD * 2;
+
+  // Background track
+  ctx.fillStyle = '#f1f5f9';
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(PAD, BAR_Y, barW, BAR_H, 5) : ctx.rect(PAD, BAR_Y, barW, BAR_H);
+  ctx.fill();
+
+  // Revealed segments
+  let cum = 0;
+  for (let i = 0; i < shown; i++) {
+    const w = (values[i] / n) * barW;
+    ctx.fillStyle = factors[i].color + 'cc';
+    ctx.fillRect(PAD + cum * barW, BAR_Y, w, BAR_H);
+    cum += values[i] / n;
+  }
+
+  // Running total marker
+  if (shown > 0) {
+    const markerX = PAD + cum * barW;
+    const runGrade = cum * 100;
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(markerX, BAR_Y - 6); ctx.lineTo(markerX, BAR_Y + BAR_H + 6); ctx.stroke();
+    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'left';
+    const lx = markerX + 8 > W - 90 ? markerX - 92 : markerX + 8;
+    ctx.fillText(`${runGrade.toFixed(1)} / 100`, lx, BAR_Y + BAR_H / 2 + 5);
+  }
+
+  // Labels below each revealed segment
+  let cum2 = 0;
+  for (let i = 0; i < shown; i++) {
+    const contrib = values[i] / n;
+    const midX = PAD + (cum2 + contrib / 2) * barW;
+    if (contrib * barW > 28) {
+      ctx.fillStyle = factors[i].color; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(factors[i].name.split(' ')[0], midX, BAR_Y + BAR_H + 13);
+      ctx.fillText(`+${(contrib * 100).toFixed(1)}`, midX, BAR_Y + BAR_H + 25);
+    }
+    cum2 += contrib;
+  }
+
+  // Dotted placeholders for unrevealed
+  for (let i = shown; i < n; i++) {
+    const w = (values[i] / n) * barW;
+    ctx.strokeStyle = factors[i].color + '55'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
+    ctx.strokeRect(PAD + cum * barW, BAR_Y, w, BAR_H);
+    ctx.setLineDash([]);
+    cum += values[i] / n;
+  }
+
+  // Title
+  ctx.fillStyle = '#475569'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left';
+  ctx.fillText(`Building grade — ${shown} of ${n} factor${n > 1 ? 's' : ''} revealed`, PAD, 26);
+  if (shown === n) {
+    ctx.fillStyle = '#4361ee'; ctx.textAlign = 'right';
+    ctx.fillText(`✓ Final Grade: ${total.toFixed(1)} / 100`, W - PAD, 26);
+  }
+}
+
+// ── Spaghetti Paths ──────────────────────────────────
+let spagPaths = [], spagStep = 0, spagTimer = null;
+
+function startSpaghetti() {
+  if (spagTimer) { clearInterval(spagTimer); spagTimer = null; }
+  const factors = getActiveFactors();
+  if (!factors.length) return;
+  spagPaths = [];
+  for (let i = 0; i < 100; i++) {
+    const pts = [];
+    let sum = 0;
+    for (let k = 0; k < factors.length; k++) {
+      sum += factors[k].sample();
+      pts.push((sum / (k + 1)) * 100); // running mean × 100
+    }
+    spagPaths.push(pts);
+  }
+  spagStep = 0;
+  drawSpag();
+  if (factors.length <= 1) return;
+  spagTimer = setInterval(() => {
+    spagStep++;
+    drawSpag();
+    if (spagStep >= factors.length - 1) { clearInterval(spagTimer); spagTimer = null; }
+  }, 700);
+}
+
+function drawSpag() {
+  const canvas = document.getElementById('spagCanvas');
+  canvas.width = canvas.offsetWidth || 700;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  if (!spagPaths.length) return;
+  const factors = getActiveFactors();
+  const n = factors.length;
+  const PL = 44, PR = 16, PT = 30, PB = 46;
+  const pW = W - PL - PR, pH = H - PT - PB;
+  const toX = k => n <= 1 ? PL + pW / 2 : PL + (k / (n - 1)) * pW;
+  const toY = v => PT + (1 - v / 100) * pH;
+
+  // Grid
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+  [0, 25, 50, 75, 100].forEach(v => {
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(W - PR, y); ctx.stroke();
+    ctx.fillStyle = '#a0aec0'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
+    ctx.fillText(v, PL - 5, y + 3);
+  });
+
+  // X ticks
+  for (let k = 0; k < n; k++) {
+    const x = toX(k);
+    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, PT + pH); ctx.lineTo(x, PT + pH + 5); ctx.stroke();
+    ctx.fillStyle = factors[k].color; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(factors[k].name.split(' ')[0], x, PT + pH + 18);
+  }
+
+  // Paths
+  spagPaths.forEach(pts => {
+    const g = pts[pts.length - 1];
+    const col = g >= 75 ? '#27ae60' : g >= 55 ? '#4361ee' : g >= 35 ? '#9b59b6' : '#e74c3c';
+    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.22;
+    ctx.beginPath(); ctx.moveTo(toX(0), toY(pts[0]));
+    for (let k = 1; k <= spagStep && k < pts.length; k++) ctx.lineTo(toX(k), toY(pts[k]));
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  // Spread annotation (±1σ bracket at current column)
+  const vals = spagPaths.map(p => p[Math.min(spagStep, p.length - 1)]);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const std = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length);
+  const cx = toX(spagStep);
+  ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2.5; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(cx, toY(mean - std)); ctx.lineTo(cx, toY(mean + std)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Title
+  ctx.fillStyle = '#1e293b'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left';
+  ctx.fillText(`After ${spagStep + 1} factor${spagStep > 0 ? 's' : ''} — spread σ = ${std.toFixed(1)} grade pts`, PL, 18);
+
+  // Y label
+  ctx.save(); ctx.translate(11, PT + pH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#718096'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText('Running avg. grade', 0, 0);
+  ctx.restore();
+}
+
+// ── Factor Cards ──────────────────────────────────────
+let cardSt = null, cardFlipTimer = null, cardFlipIdx = 0;
+
+function newCardDeal() {
+  if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
+  const factors = getActiveFactors();
+  if (!factors.length) return;
+  cardSt = { factors, values: factors.map(f => f.sample()), flipped: new Array(factors.length).fill(false) };
+  cardSt.total = (cardSt.values.reduce((a, b) => a + b, 0) / factors.length) * 100;
+  cardFlipIdx = 0;
+  renderCards();
+  cardFlipTimer = setInterval(() => {
+    if (cardFlipIdx >= cardSt.factors.length) { clearInterval(cardFlipTimer); cardFlipTimer = null; return; }
+    cardSt.flipped[cardFlipIdx++] = true;
+    renderCards();
+  }, 650);
+}
+
+function flipAllCards() {
+  if (!cardSt) return;
+  if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
+  cardSt.flipped = cardSt.flipped.map(() => true);
+  renderCards();
+}
+
+function flipCard(i) {
+  if (!cardSt || cardSt.flipped[i]) return;
+  if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
+  cardSt.flipped[i] = true;
+  renderCards();
+}
+
+function renderCards() {
+  if (!cardSt) return;
+  const { factors, values, flipped } = cardSt;
+  const nF = flipped.filter(Boolean).length;
+  const runGrade = nF > 0 ? (values.slice(0, nF).reduce((a, b) => a + b, 0) / factors.length) * 100 : null;
+
+  document.getElementById('cardDeck').innerHTML = factors.map((f, i) => `
+    <div class="fc-wrap${flipped[i] ? ' flipped' : ''}" onclick="flipCard(${i})">
+      <div class="fc-inner">
+        <div class="fc-face">?</div>
+        <div class="fc-back" style="border-color:${f.color}">
+          <div class="fc-nm" style="color:${f.color}">${f.name}</div>
+          <div class="fc-val" style="color:${f.color}">${(values[i]*100).toFixed(0)}<span style="font-size:.5em;font-weight:500">/100</span></div>
+          <div class="fc-bar"><div class="fc-fill" style="width:${values[i]*100}%;background:${f.color}"></div></div>
+          <div class="fc-sh">${f.shape}</div>
+          <div class="fc-pts">+${((values[i]/factors.length)*100).toFixed(1)} pts</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  const el = document.getElementById('cardTotal');
+  el.textContent = runGrade === null ? 'Cards face down…'
+    : nF === factors.length ? `✓ Final Grade: ${cardSt.total.toFixed(1)} / 100`
+    : `Running total: ${runGrade.toFixed(1)} / 100  (${nF} of ${factors.length} factors)`;
+  el.style.color = nF === factors.length ? '#4361ee' : '#2d3a9a';
 }
 
 // ══════════════════════════════════════════════════════
