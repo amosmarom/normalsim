@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,12 +12,19 @@
       --primary-light: #eef2ff; --text: #1a202c; --muted: #718096; --border: #e2e8f0;
     }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    html[dir="rtl"] body { font-family: 'Segoe UI', 'Arial', system-ui, sans-serif; }
 
     /* Header */
-    header { background: linear-gradient(135deg,#4361ee,#7209b7); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; }
+    header { background: linear-gradient(135deg,#4361ee,#7209b7); color:#fff; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
     header h1 { font-size:1.5rem; font-weight:800; letter-spacing:-0.02em; }
     header .subtitle { font-size:.78rem; opacity:.85; margin-top:2px; }
-    header .tagline { font-size:.75rem; opacity:.8; text-align:right; max-width:230px; line-height:1.5; }
+    .header-right { display:flex; flex-direction:column; align-items:flex-end; gap:.45rem; }
+    html[dir="rtl"] .header-right { align-items:flex-start; }
+    header .tagline { font-size:.75rem; opacity:.8; text-align:right; max-width:260px; line-height:1.5; }
+    html[dir="rtl"] header .tagline { text-align:left; }
+    .header-version { font-size:.68rem; opacity:.65; margin-top:3px; letter-spacing:.01em; }
+    .lang-btn { padding:.32rem .75rem; background:rgba(255,255,255,.18); color:#fff; border:1.5px solid rgba(255,255,255,.45); border-radius:7px; font-size:.78rem; font-weight:700; cursor:pointer; transition:background .15s; white-space:nowrap; letter-spacing:.01em; }
+    .lang-btn:hover { background:rgba(255,255,255,.32); }
 
     /* Layout */
     .container { display:grid; grid-template-columns:320px 1fr; gap:1rem; padding:1rem; max-width:1280px; margin:0 auto; }
@@ -113,20 +120,24 @@
 <header>
   <div>
     <h1>NormalSim</h1>
-    <div class="subtitle">Central Limit Theorem Explorer</div>
+    <div class="subtitle" id="hdrSubtitle">Central Limit Theorem Explorer</div>
+    <div class="header-version">v1.0 &nbsp;·&nbsp; 2026-04-09</div>
   </div>
-  <div class="tagline">Activate exam factors → Run simulation<br>Watch their sum converge to a bell curve</div>
+  <div class="header-right">
+    <button class="lang-btn" id="langBtn" onclick="toggleLang()">עברית</button>
+    <div class="tagline" id="hdrTagline">Activate exam factors → Run simulation<br>Watch their sum converge to a bell curve</div>
+  </div>
 </header>
 
 <div class="container">
   <!-- ── Left ── -->
   <div>
     <div class="card">
-      <div class="card-title">Exam Factors (pick 1–7)</div>
+      <div class="card-title" id="factorsCardTitle">Exam Factors (pick 1–7)</div>
       <div id="factorList"></div>
       <div class="controls-section">
         <div class="ctrl-row">
-          <span class="ctrl-label">Number of Students</span>
+          <span class="ctrl-label" id="nStudentsLabel">Number of Students</span>
           <span class="ctrl-value" id="studentLabel">500</span>
         </div>
         <input type="range" id="studentSlider" min="10" max="5000" step="10" value="500"
@@ -148,8 +159,8 @@
       <div class="chart-wrap">
         <div class="empty-state" id="emptyState">
           <div class="emo">📊</div>
-          <p>No simulation yet</p>
-          <small>Activate some factors and press Run</small>
+          <p id="emptyStateMsg">No simulation yet</p>
+          <small id="emptyStateHint">Activate some factors and press Run</small>
         </div>
         <canvas id="mainChart"></canvas>
       </div>
@@ -157,22 +168,22 @@
 
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-label">Mean Grade</div>
+        <div class="stat-label" id="statMeanLabel">Mean Grade</div>
         <div class="stat-value" id="statMean">—</div>
         <div class="stat-sub" id="statMeanSub">&nbsp;</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Std Deviation</div>
+        <div class="stat-label" id="statStdLabel">Std Deviation</div>
         <div class="stat-value" id="statStd">—</div>
         <div class="stat-sub" id="statStdSub">&nbsp;</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Skewness</div>
+        <div class="stat-label" id="statSkewLabel">Skewness</div>
         <div class="stat-value" id="statSkew">—</div>
         <div class="stat-sub" id="statSkewSub">&nbsp;</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Distribution Shape</div>
+        <div class="stat-label" id="statShapeLabel">Distribution Shape</div>
         <div class="stat-value" id="statShape" style="font-size:.88rem">—</div>
         <div class="stat-sub" id="statShapeSub">&nbsp;</div>
       </div>
@@ -180,23 +191,23 @@
 
     <!-- Box plot -->
     <div class="card" id="boxPlotCard">
-      <div class="card-title">Box Plot</div>
+      <div class="card-title" id="boxPlotTitle">Box Plot</div>
       <div class="bp-legend">
         <span>
           <svg width="16" height="12"><rect x="1" y="1" width="14" height="10" fill="rgba(67,97,238,.25)" stroke="#4361ee" stroke-width="1.5" rx="2"/></svg>
-          IQR Box (Q1–Q3)
+          <span id="legendIQRSpan">IQR Box (Q1–Q3)</span>
         </span>
         <span>
           <svg width="12" height="12"><line x1="6" y1="0" x2="6" y2="12" stroke="#e74c3c" stroke-width="2.5"/></svg>
-          Median
+          <span id="legendMedianSpan">Median</span>
         </span>
         <span>
           <svg width="14" height="12"><polygon points="7,0 13,6 7,12 1,6" fill="#27ae60"/></svg>
-          Mean
+          <span id="legendMeanSpan">Mean</span>
         </span>
         <span>
           <svg width="12" height="12"><circle cx="6" cy="6" r="4" fill="rgba(231,76,60,.55)"/></svg>
-          Outliers (±1.5 IQR)
+          <span id="legendOutliersSpan">Outliers (±1.5 IQR)</span>
         </span>
       </div>
       <canvas id="boxPlotCanvas" height="130"></canvas>
@@ -206,33 +217,33 @@
   <!-- Teaching Aid -->
   <div class="card" id="teachingAidCard" style="display:none">
     <div class="aid-header">
-      <div class="card-title" style="margin:0">Teaching Aid — CLT in Action</div>
+      <div class="card-title" id="teachingAidTitle" style="margin:0">Teaching Aid — CLT in Action</div>
       <div class="aid-tabs">
-        <button class="aid-tab active" data-mode="build" onclick="setAid('build')">📊 Build-a-Grade</button>
-        <button class="aid-tab" data-mode="spag"  onclick="setAid('spag')">〰 Spaghetti Paths</button>
-        <button class="aid-tab" data-mode="cards" onclick="setAid('cards')">🃏 Factor Cards</button>
+        <button class="aid-tab active" id="aidBuildTab" data-mode="build" onclick="setAid('build')">📊 Build-a-Grade</button>
+        <button class="aid-tab" id="aidSpagTab" data-mode="spag"  onclick="setAid('spag')">〰 Spaghetti Paths</button>
+        <button class="aid-tab" id="aidCardsTab" data-mode="cards" onclick="setAid('cards')">🃏 Factor Cards</button>
       </div>
     </div>
     <!-- Build-a-Grade -->
     <div id="aidBuild">
       <div class="aid-ctrl">
-        <button class="aid-btn primary" onclick="newBuildStudent()">🎲 New Student</button>
-        <button class="aid-btn" onclick="replayBuild()">↺ Replay</button>
+        <button class="aid-btn primary" id="btnNewBuild" onclick="newBuildStudent()">🎲 New Student</button>
+        <button class="aid-btn" id="btnReplayBuild" onclick="replayBuild()">↺ Replay</button>
       </div>
       <canvas id="buildCanvas" class="aid-canvas" height="130"></canvas>
     </div>
     <!-- Spaghetti Paths -->
     <div id="aidSpag" style="display:none">
       <div class="aid-ctrl">
-        <button class="aid-btn primary" onclick="startSpaghetti()">▶ Animate</button>
+        <button class="aid-btn primary" id="btnAnimateSpag" onclick="startSpaghetti()">▶ Animate</button>
       </div>
       <canvas id="spagCanvas" class="aid-canvas" height="300"></canvas>
     </div>
     <!-- Factor Cards -->
     <div id="aidCards" style="display:none">
       <div class="aid-ctrl">
-        <button class="aid-btn primary" onclick="newCardDeal()">🎲 New Student</button>
-        <button class="aid-btn" onclick="flipAllCards()">👁 Reveal All</button>
+        <button class="aid-btn primary" id="btnNewCards" onclick="newCardDeal()">🎲 New Student</button>
+        <button class="aid-btn" id="btnRevealAll" onclick="flipAllCards()">👁 Reveal All</button>
       </div>
       <div class="card-deck" id="cardDeck"></div>
       <div class="fc-total" id="cardTotal">—</div>
@@ -242,6 +253,175 @@
 </div>
 
 <script>
+// ══════════════════════════════════════════════════════
+//  I18N
+// ══════════════════════════════════════════════════════
+
+let lang = 'en';
+function tx() { return T[lang]; }
+function toggleLang() {
+  lang = lang === 'en' ? 'he' : 'en';
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+  document.getElementById('langBtn').textContent = lang === 'en' ? 'עברית' : 'English';
+  applyLang();
+}
+
+const T = {
+  en: {
+    subtitle: 'Central Limit Theorem Explorer',
+    tagline: 'Activate exam factors → Run simulation\nWatch their sum converge to a bell curve',
+    factorsTitle: 'Exam Factors (pick 1–7)',
+    nStudents: 'Number of Students',
+    runBtn: '▶ Run Simulation',
+    runBtnStop: '⬛ Stop',
+    emptyMsg: 'No simulation yet',
+    emptyHint: 'Activate some factors and press Run',
+    statMeanLabel: 'Mean Grade',
+    statStdLabel: 'Std Deviation',
+    statSkewLabel: 'Skewness',
+    statShapeLabel: 'Distribution Shape',
+    outOf100: 'out of 100',
+    gradePoints: 'grade points',
+    rightTail: 'right tail',
+    leftTail: 'left tail',
+    symmetric: 'symmetric',
+    shapeNormal: 'Normal ✓',
+    shapeNearNormal: 'Near-Normal',
+    shapeRight: 'Right-Skewed',
+    shapeLeft: 'Left-Skewed',
+    shapeOneFactor: '1 factor only',
+    shapeNearNormalSub: 'Almost there',
+    shapeCLT: 'CLT achieved!',
+    shapeAddMore: 'Add more factors',
+    boxPlotTitle: 'Box Plot',
+    legendIQR: 'IQR Box (Q1–Q3)',
+    legendMedian: 'Median',
+    legendMean: 'Mean',
+    legendOutliers: 'Outliers (±1.5 IQR)',
+    teachingAidTitle: 'Teaching Aid — CLT in Action',
+    tabBuild: '📊 Build-a-Grade',
+    tabSpag: '〰 Spaghetti Paths',
+    tabCards: '🃏 Factor Cards',
+    btnNewStudent: '🎲 New Student',
+    btnReplay: '↺ Replay',
+    btnAnimate: '▶ Animate',
+    btnRevealAll: '👁 Reveal All',
+    cardsDown: 'Cards face down…',
+    cardsRunning: (grade, nF, nTotal) => `Running total: ${grade} / 100  (${nF} of ${nTotal} factors)`,
+    cardsFinal: total => `✓ Final Grade: ${total} / 100`,
+    buildTitle: (shown, n) => `Building grade — ${shown} of ${n} factor${n > 1 ? 's' : ''} revealed`,
+    buildFinal: total => `✓ Final Grade: ${total} / 100`,
+    spagTitle: (step, std) => `After ${step + 1} factor${step > 0 ? 's' : ''} — spread σ = ${std} grade pts`,
+    spagYLabel: 'Running avg. grade',
+    progText: (done, total, secs) => `${done} / ${total} students · ${secs}s left`,
+    chartTitleGenerating: (done, total) => `Grade Distribution — generating… ${done} / ${total}`,
+    chartTitleDone: (n, f) => `Grade Distribution — ${n} students · ${f} factor${f > 1 ? 's' : ''} active`,
+    chartTitleDefault: 'Grade Distribution',
+    datasetHist: 'Histogram (density)',
+    datasetKDE: 'KDE',
+    datasetNormal: 'Normal reference (same μ, σ)',
+    axisGrade: 'Grade (0–100)',
+    axisDensity: 'Density',
+    factors: [
+      { name: 'Study Hours',      desc: 'Time spent preparing for the exam',                              shape: 'Right-Skewed' },
+      { name: 'Natural Aptitude', desc: 'Innate academic ability of the student',                         shape: 'Normal' },
+      { name: 'Attendance Rate',  desc: 'Regularity of class attendance',                                 shape: 'Left-Skewed' },
+      { name: 'Sleep Quality',    desc: 'Sleep quality the night before the exam',                        shape: 'Uniform' },
+      { name: 'Test Anxiety',     desc: 'Calm students score high; anxious students score low',           shape: 'Bimodal' },
+      { name: 'Prior Knowledge',  desc: "Background from prerequisites — either you have it or you don't", shape: 'U-Shaped' },
+      { name: 'Luck Factor',      desc: 'Random events on exam day — familiar questions, good guesses',   shape: 'Triangular' }
+    ],
+    insights: [
+      () => 'Select at least one factor to begin.',
+      (name, shape) => `With <strong>1 factor</strong>, the distribution directly shows <strong>${name}</strong>'s shape — <strong>${shape}</strong>. The CLT needs multiple independent factors to take effect.`,
+      () => 'With <strong>2 factors</strong>, the sum begins to smooth out, but the original shapes still dominate.',
+      () => 'With <strong>3 factors</strong>, symmetry is emerging and tails are softening. Watch the bell curve begin to appear!',
+      () => 'With <strong>4 factors</strong>, the distribution is clearly more bell-shaped. The CLT is working — regardless of each factor\'s individual shape.',
+      () => 'With <strong>5 factors</strong>, the histogram closely matches the green dashed normal reference.',
+      () => 'With <strong>6 factors</strong>, the bell curve is nearly perfect. Notice how the red KDE hugs the green dashed curve.',
+      () => 'With <strong>all 7 factors</strong>, the distribution is essentially normal — regardless of the original shapes. This is the <strong>Central Limit Theorem</strong>!'
+    ]
+  },
+  he: {
+    subtitle: 'חוקר משפט הגבול המרכזי',
+    tagline: 'הפעל גורמי בחינה ← הרץ סימולציה\nצפה כיצד סכומם מתכנס לעקומת פעמון',
+    factorsTitle: 'גורמי בחינה (בחר 1–7)',
+    nStudents: 'מספר תלמידים',
+    runBtn: '▶ הרץ סימולציה',
+    runBtnStop: '⬛ עצור',
+    emptyMsg: 'עדיין אין סימולציה',
+    emptyHint: 'הפעל גורמים ולחץ הרץ',
+    statMeanLabel: 'ממוצע ציון',
+    statStdLabel: 'סטיית תקן',
+    statSkewLabel: 'אסימטריה',
+    statShapeLabel: 'צורת התפלגות',
+    outOf100: 'מתוך 100',
+    gradePoints: 'נקודות ציון',
+    rightTail: 'זנב ימני',
+    leftTail: 'זנב שמאלי',
+    symmetric: 'סימטרי',
+    shapeNormal: 'נורמלי ✓',
+    shapeNearNormal: 'כמעט נורמלי',
+    shapeRight: 'מוטה ימינה',
+    shapeLeft: 'מוטה שמאלה',
+    shapeOneFactor: 'גורם אחד בלבד',
+    shapeNearNormalSub: 'כמעט הגענו',
+    shapeCLT: '!CLT הושג',
+    shapeAddMore: 'הוסף עוד גורמים',
+    boxPlotTitle: 'תרשים קופסה',
+    legendIQR: 'קופסת IQR (Q1–Q3)',
+    legendMedian: 'חציון',
+    legendMean: 'ממוצע',
+    legendOutliers: 'ערכים חריגים (±1.5 IQR)',
+    teachingAidTitle: 'עזר הוראה — CLT בפעולה',
+    tabBuild: '📊 בנה-ציון',
+    tabSpag: '〰 נתיבי ספגטי',
+    tabCards: '🃏 קלפי גורמים',
+    btnNewStudent: '🎲 תלמיד חדש',
+    btnReplay: '↺ שוב',
+    btnAnimate: '▶ הנפש',
+    btnRevealAll: '👁 גלה הכל',
+    cardsDown: 'קלפים פונים כלפי מטה…',
+    cardsRunning: (grade, nF, nTotal) => `סה"כ רץ: ${grade} / 100  (${nF} מתוך ${nTotal} גורמים)`,
+    cardsFinal: total => `✓ ציון סופי: ${total} / 100`,
+    buildTitle: (shown, n) => `בניית ציון — ${shown} מתוך ${n} גורמים גולו`,
+    buildFinal: total => `✓ ציון סופי: ${total} / 100`,
+    spagTitle: (step, std) => `אחרי ${step + 1} גורמים — פיזור σ = ${std} נקודות`,
+    spagYLabel: 'ממוצע רץ',
+    progText: (done, total, secs) => `${done} / ${total} תלמידים · ${secs} שניות`,
+    chartTitleGenerating: (done, total) => `התפלגות ציונים — מייצר… ${done} / ${total}`,
+    chartTitleDone: (n, f) => `התפלגות ציונים — ${n} תלמידים · ${f} גורמים פעילים`,
+    chartTitleDefault: 'התפלגות ציונים',
+    datasetHist: 'היסטוגרמה (צפיפות)',
+    datasetKDE: 'KDE',
+    datasetNormal: 'עקומה נורמלית (אותם μ, σ)',
+    axisGrade: 'ציון (0–100)',
+    axisDensity: 'צפיפות',
+    factors: [
+      { name: 'שעות לימוד',   desc: 'זמן הכנה לבחינה',                            shape: 'מוטה ימינה' },
+      { name: 'כישרון טבעי',  desc: 'יכולת אקדמית טבועה',                         shape: 'נורמלי' },
+      { name: 'נוכחות',       desc: 'סדירות הגעה לשיעורים',                        shape: 'מוטה שמאלה' },
+      { name: 'איכות שינה',   desc: 'שינה לפני הבחינה',                            shape: 'אחיד' },
+      { name: 'חרדת בחינות',  desc: 'תלמידים רגועים מצליחים; חרדים נכשלים',       shape: 'דו-שיאי' },
+      { name: 'ידע קודם',     desc: 'רקע מקורסי קדם — יש או אין',                  shape: 'צורת U' },
+      { name: 'גורם מזל',     desc: 'אירועים אקראיים ביום הבחינה',                 shape: 'משולשי' }
+    ],
+    insights: [
+      () => 'בחר לפחות גורם אחד כדי להתחיל.',
+      (name, shape) => `עם <strong>גורם אחד</strong>, ההתפלגות מציגה ישירות את צורת <strong>${name}</strong> — <strong>${shape}</strong>. ה-CLT דורש מספר גורמים בלתי-תלויים כדי לפעול.`,
+      () => 'עם <strong>2 גורמים</strong>, הסכום מתחיל להחליק, אך הצורות המקוריות עדיין שולטות.',
+      () => 'עם <strong>3 גורמים</strong>, סימטריה מתחילה להופיע והזנבות מתרככים. צפה בעקומת הפעמון מתעוררת!',
+      () => 'עם <strong>4 גורמים</strong>, ההתפלגות בעלת צורת פעמון ברורה. ה-CLT פועל — ללא קשר לצורות המקוריות.',
+      () => 'עם <strong>5 גורמים</strong>, ההיסטוגרמה תואמת מקרוב את העקומה הנורמלית הירוקה המקווקוות.',
+      () => 'עם <strong>6 גורמים</strong>, עקומת הפעמון כמעט מושלמת. שים לב כיצד ה-KDE האדום תואם את העקומה הירוקה.',
+      () => 'עם <strong>כל 7 הגורמים</strong>, ההתפלגות נורמלית למעשה — ללא קשר לצורות המקוריות. זהו <strong>משפט הגבול המרכזי</strong>!'
+    ]
+  }
+};
+
+function tFactor(i) { return tx().factors[i]; }
+
 // ══════════════════════════════════════════════════════
 //  DISTRIBUTIONS
 // ══════════════════════════════════════════════════════
@@ -360,14 +540,15 @@ function normalDens(mu, sig) {
 function initChart() {
   if (mainChart) { mainChart.destroy(); mainChart = null; }
   const ctx = document.getElementById('mainChart').getContext('2d');
+  const t = tx();
   mainChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: BIN_LB,
       datasets: [
-        { label: 'Histogram (density)', data: new Array(BIN_N).fill(0), backgroundColor: 'rgba(67,97,238,.40)', borderColor: 'rgba(67,97,238,.75)', borderWidth: 1, borderRadius: 2, order: 3 },
-        { label: 'KDE', type: 'line', data: new Array(BIN_N).fill(0), borderColor: '#e74c3c', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.45, order: 1 },
-        { label: 'Normal reference (same μ, σ)', type: 'line', data: new Array(BIN_N).fill(0), borderColor: '#27ae60', borderWidth: 2, borderDash: [7, 4], pointRadius: 0, fill: false, tension: 0.45, order: 2 }
+        { label: t.datasetHist, data: new Array(BIN_N).fill(0), backgroundColor: 'rgba(67,97,238,.40)', borderColor: 'rgba(67,97,238,.75)', borderWidth: 1, borderRadius: 2, order: 3 },
+        { label: t.datasetKDE, type: 'line', data: new Array(BIN_N).fill(0), borderColor: '#e74c3c', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.45, order: 1 },
+        { label: t.datasetNormal, type: 'line', data: new Array(BIN_N).fill(0), borderColor: '#27ae60', borderWidth: 2, borderDash: [7, 4], pointRadius: 0, fill: false, tension: 0.45, order: 2 }
       ]
     },
     options: {
@@ -377,8 +558,8 @@ function initChart() {
         tooltip: { callbacks: { title: ctx => `Grade ${ctx[0].label}–${+ctx[0].label + BIN_W}`, label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(4)}` } }
       },
       scales: {
-        x: { title: { display: true, text: 'Grade (0–100)', font: { size: 11 } }, ticks: { maxTicksLimit: 11 } },
-        y: { title: { display: true, text: 'Density', font: { size: 11 } }, beginAtZero: true }
+        x: { title: { display: true, text: t.axisGrade, font: { size: 11 } }, ticks: { maxTicksLimit: 11 } },
+        y: { title: { display: true, text: t.axisDensity, font: { size: 11 } }, beginAtZero: true }
       }
     }
   });
@@ -521,7 +702,7 @@ function startAnim() {
   document.getElementById('progWrap').style.display   = 'flex';
 
   const btn = document.getElementById('runBtn');
-  btn.textContent = '⬛ Stop';
+  btn.textContent = tx().runBtnStop;
   btn.style.background = '#c53030';
 
   initChart();
@@ -548,8 +729,8 @@ function startAnim() {
     const pct = anim.ticksDone / SIM_TICKS;
     const secsLeft = Math.ceil((SIM_TICKS - anim.ticksDone) * 0.1);
     document.getElementById('progFill').style.width = (pct * 100).toFixed(1) + '%';
-    document.getElementById('progText').textContent = `${anim.grades.length.toLocaleString()} / ${targetN.toLocaleString()} students · ${secsLeft}s left`;
-    document.getElementById('chartTitle').textContent = `Grade Distribution — generating… ${anim.grades.length.toLocaleString()} / ${targetN.toLocaleString()}`;
+    document.getElementById('progText').textContent = tx().progText(anim.grades.length.toLocaleString(), targetN.toLocaleString(), secsLeft);
+    document.getElementById('chartTitle').textContent = tx().chartTitleGenerating(anim.grades.length.toLocaleString(), targetN.toLocaleString());
 
     if (anim.ticksDone >= SIM_TICKS) finalizeAnim();
   }, 100);
@@ -571,13 +752,12 @@ function finalizeAnim() {
     renderBoxPlot(grades);
     const { mu, s, skew } = computeStats(grades);
     updateStats(mu, s, skew, factors.length);
-    document.getElementById('chartTitle').textContent =
-      `Grade Distribution — ${grades.length.toLocaleString()} students · ${factors.length} factor${factors.length > 1 ? 's' : ''} active`;
+    document.getElementById('chartTitle').textContent = tx().chartTitleDone(grades.length.toLocaleString(), factors.length);
   }
 
   document.getElementById('progWrap').style.display = 'none';
   const btn = document.getElementById('runBtn');
-  btn.textContent = '▶ Run Simulation';
+  btn.textContent = tx().runBtn;
   btn.style.background = '';
   showTeachingAid();
 }
@@ -590,24 +770,25 @@ function updateStats(mu, s, skew, nFactors) {
   const abs = Math.abs(skew);
   let shape, shapeSub, skewColor;
 
+  const t = tx();
   if (nFactors === 1) {
-    shape = FACTORS[[...active][0]].shape; shapeSub = '1 factor only'; skewColor = '#e67e22';
+    shape = tFactor([...active][0]).shape; shapeSub = t.shapeOneFactor; skewColor = '#e67e22';
   } else if (abs < 0.12) {
-    shape = 'Normal ✓'; shapeSub = 'CLT achieved!'; skewColor = '#27ae60';
+    shape = t.shapeNormal; shapeSub = t.shapeCLT; skewColor = '#27ae60';
   } else if (abs < 0.35) {
-    shape = 'Near-Normal'; shapeSub = 'Almost there'; skewColor = '#e67e22';
+    shape = t.shapeNearNormal; shapeSub = t.shapeNearNormalSub; skewColor = '#e67e22';
   } else {
-    shape = skew > 0 ? 'Right-Skewed' : 'Left-Skewed'; shapeSub = 'Add more factors'; skewColor = '#e53e3e';
+    shape = skew > 0 ? t.shapeRight : t.shapeLeft; shapeSub = t.shapeAddMore; skewColor = '#e53e3e';
   }
 
   document.getElementById('statMean').textContent    = mu.toFixed(1);
-  document.getElementById('statMeanSub').textContent = 'out of 100';
+  document.getElementById('statMeanSub').textContent = t.outOf100;
   document.getElementById('statStd').textContent     = s.toFixed(1);
-  document.getElementById('statStdSub').textContent  = 'grade points';
+  document.getElementById('statStdSub').textContent  = t.gradePoints;
 
   const skewEl = document.getElementById('statSkew');
   skewEl.textContent = skew.toFixed(3); skewEl.style.color = skewColor;
-  document.getElementById('statSkewSub').textContent = skew > 0.05 ? 'right tail' : skew < -0.05 ? 'left tail' : 'symmetric';
+  document.getElementById('statSkewSub').textContent = skew > 0.05 ? t.rightTail : skew < -0.05 ? t.leftTail : t.symmetric;
 
   document.getElementById('statShape').textContent    = shape;
   document.getElementById('statShapeSub').textContent = shapeSub;
@@ -617,20 +798,16 @@ function updateStats(mu, s, skew, nFactors) {
 //  CLT INSIGHT TEXT
 // ══════════════════════════════════════════════════════
 
-const INSIGHTS = [
-  () => 'Select at least one factor to begin.',
-  idx => `With <strong>1 factor</strong>, the distribution directly shows <strong>${FACTORS[idx].name}</strong>'s shape — <strong>${FACTORS[idx].shape}</strong>. The CLT needs multiple independent factors to take effect.`,
-  () => `With <strong>2 factors</strong>, the sum begins to smooth out, but the original shapes still dominate.`,
-  () => `With <strong>3 factors</strong>, symmetry is emerging and tails are softening. Watch the bell curve begin to appear!`,
-  () => `With <strong>4 factors</strong>, the distribution is clearly more bell-shaped. The CLT is working — regardless of each factor's individual shape.`,
-  () => `With <strong>5 factors</strong>, the histogram closely matches the green dashed normal reference.`,
-  () => `With <strong>6 factors</strong>, the bell curve is nearly perfect. Notice how the red KDE hugs the green dashed curve.`,
-  () => `With <strong>all 7 factors</strong>, the distribution is essentially normal — regardless of the original shapes. This is the <strong>Central Limit Theorem</strong>!`
-];
+function getInsight(n, activeArr) {
+  const ins = tx().insights;
+  if (n === 0) return ins[0]();
+  if (n === 1) { const idx = activeArr[0]; return ins[1](tFactor(idx).name, tFactor(idx).shape); }
+  return ins[Math.min(n, 7)]();
+}
 
 function updateInsight() {
   const n = active.size, el = document.getElementById('cltInsight');
-  el.innerHTML = n === 0 ? INSIGHTS[0]() : n === 1 ? INSIGHTS[1]([...active][0]) : INSIGHTS[Math.min(n, 7)]();
+  el.innerHTML = getInsight(n, [...active]);
 }
 
 // ══════════════════════════════════════════════════════
@@ -733,7 +910,7 @@ function drawBuild() {
     const midX = PAD + (cum2 + contrib / 2) * barW;
     if (contrib * barW > 28) {
       ctx.fillStyle = factors[i].color; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(factors[i].name.split(' ')[0], midX, BAR_Y + BAR_H + 13);
+      ctx.fillText(tFactor(FACTORS.indexOf(factors[i])).name.split(' ')[0], midX, BAR_Y + BAR_H + 13);
       ctx.fillText(`+${(contrib * 100).toFixed(1)}`, midX, BAR_Y + BAR_H + 25);
     }
     cum2 += contrib;
@@ -750,10 +927,10 @@ function drawBuild() {
 
   // Title
   ctx.fillStyle = '#475569'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left';
-  ctx.fillText(`Building grade — ${shown} of ${n} factor${n > 1 ? 's' : ''} revealed`, PAD, 26);
+  ctx.fillText(tx().buildTitle(shown, n), PAD, 26);
   if (shown === n) {
     ctx.fillStyle = '#4361ee'; ctx.textAlign = 'right';
-    ctx.fillText(`✓ Final Grade: ${total.toFixed(1)} / 100`, W - PAD, 26);
+    ctx.fillText(tx().buildFinal(total.toFixed(1)), W - PAD, 26);
   }
 }
 
@@ -813,7 +990,7 @@ function drawSpag() {
     ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, PT + pH); ctx.lineTo(x, PT + pH + 5); ctx.stroke();
     ctx.fillStyle = factors[k].color; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText(factors[k].name.split(' ')[0], x, PT + pH + 18);
+    ctx.fillText(tFactor(FACTORS.indexOf(factors[k])).name.split(' ')[0], x, PT + pH + 18);
   }
 
   // Paths
@@ -838,12 +1015,12 @@ function drawSpag() {
 
   // Title
   ctx.fillStyle = '#1e293b'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left';
-  ctx.fillText(`After ${spagStep + 1} factor${spagStep > 0 ? 's' : ''} — spread σ = ${std.toFixed(1)} grade pts`, PL, 18);
+  ctx.fillText(tx().spagTitle(spagStep, std.toFixed(1)), PL, 18);
 
   // Y label
   ctx.save(); ctx.translate(11, PT + pH / 2); ctx.rotate(-Math.PI / 2);
   ctx.fillStyle = '#718096'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
-  ctx.fillText('Running avg. grade', 0, 0);
+  ctx.fillText(tx().spagYLabel, 0, 0);
   ctx.restore();
 }
 
@@ -885,24 +1062,29 @@ function renderCards() {
   const nF = flipped.filter(Boolean).length;
   const runGrade = nF > 0 ? (values.slice(0, nF).reduce((a, b) => a + b, 0) / factors.length) * 100 : null;
 
-  document.getElementById('cardDeck').innerHTML = factors.map((f, i) => `
+  document.getElementById('cardDeck').innerHTML = factors.map((f, i) => {
+    const fi = FACTORS.indexOf(f);
+    const tf = tFactor(fi);
+    return `
     <div class="fc-wrap${flipped[i] ? ' flipped' : ''}" onclick="flipCard(${i})">
       <div class="fc-inner">
         <div class="fc-face">?</div>
         <div class="fc-back" style="border-color:${f.color}">
-          <div class="fc-nm" style="color:${f.color}">${f.name}</div>
+          <div class="fc-nm" style="color:${f.color}">${tf.name}</div>
           <div class="fc-val" style="color:${f.color}">${(values[i]*100).toFixed(0)}<span style="font-size:.5em;font-weight:500">/100</span></div>
           <div class="fc-bar"><div class="fc-fill" style="width:${values[i]*100}%;background:${f.color}"></div></div>
-          <div class="fc-sh">${f.shape}</div>
+          <div class="fc-sh">${tf.shape}</div>
           <div class="fc-pts">+${((values[i]/factors.length)*100).toFixed(1)} pts</div>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const el = document.getElementById('cardTotal');
-  el.textContent = runGrade === null ? 'Cards face down…'
-    : nF === factors.length ? `✓ Final Grade: ${cardSt.total.toFixed(1)} / 100`
-    : `Running total: ${runGrade.toFixed(1)} / 100  (${nF} of ${factors.length} factors)`;
+  const t = tx();
+  el.textContent = runGrade === null ? t.cardsDown
+    : nF === factors.length ? t.cardsFinal(cardSt.total.toFixed(1))
+    : t.cardsRunning(runGrade.toFixed(1), nF, factors.length);
   el.style.color = nF === factors.length ? '#4361ee' : '#2d3a9a';
 }
 
@@ -932,16 +1114,17 @@ function drawSparkline(canvas, factor) {
 function renderFactorCards() {
   const list = document.getElementById('factorList');
   FACTORS.forEach((f, i) => {
+    const tf = tFactor(i);
     const card = document.createElement('div');
     card.className = 'factor-card';
     card.style.setProperty('--fc', f.color);
     card.style.setProperty('--fc-bg', `rgba(${hexToRgb(f.color)},.1)`);
-    card.title = f.desc;
+    card.title = tf.desc;
     card.innerHTML = `
       <div class="factor-check">✓</div>
       <div class="factor-info">
-        <div class="factor-name">${f.name}</div>
-        <span class="factor-badge">${f.shape}</span>
+        <div class="factor-name">${tf.name}</div>
+        <span class="factor-badge">${tf.shape}</span>
       </div>
       <canvas class="factor-spark" width="52" height="28"></canvas>
     `;
@@ -957,11 +1140,79 @@ function renderFactorCards() {
 }
 
 // ══════════════════════════════════════════════════════
+//  APPLY LANG
+// ══════════════════════════════════════════════════════
+
+function applyLang() {
+  const t = tx();
+
+  // Header
+  document.getElementById('hdrSubtitle').textContent = t.subtitle;
+  const taglineEl = document.getElementById('hdrTagline');
+  const [line1, line2] = t.tagline.split('\n');
+  taglineEl.innerHTML = line1 + '<br>' + line2;
+
+  // Left panel
+  document.getElementById('factorsCardTitle').textContent = t.factorsTitle;
+  document.getElementById('nStudentsLabel').textContent = t.nStudents;
+
+  // Run button — only update if not currently running
+  if (!anim.running) {
+    document.getElementById('runBtn').textContent = t.runBtn;
+  }
+
+  // Empty state
+  document.getElementById('emptyStateMsg').textContent = t.emptyMsg;
+  document.getElementById('emptyStateHint').textContent = t.emptyHint;
+
+  // Stat labels
+  document.getElementById('statMeanLabel').textContent = t.statMeanLabel;
+  document.getElementById('statStdLabel').textContent = t.statStdLabel;
+  document.getElementById('statSkewLabel').textContent = t.statSkewLabel;
+  document.getElementById('statShapeLabel').textContent = t.statShapeLabel;
+
+  // Box plot
+  document.getElementById('boxPlotTitle').textContent = t.boxPlotTitle;
+  document.getElementById('legendIQRSpan').textContent = t.legendIQR;
+  document.getElementById('legendMedianSpan').textContent = t.legendMedian;
+  document.getElementById('legendMeanSpan').textContent = t.legendMean;
+  document.getElementById('legendOutliersSpan').textContent = t.legendOutliers;
+
+  // Teaching Aid
+  document.getElementById('teachingAidTitle').textContent = t.teachingAidTitle;
+  document.getElementById('aidBuildTab').textContent = t.tabBuild;
+  document.getElementById('aidSpagTab').textContent = t.tabSpag;
+  document.getElementById('aidCardsTab').textContent = t.tabCards;
+  document.getElementById('btnNewBuild').textContent = t.btnNewStudent;
+  document.getElementById('btnReplayBuild').textContent = t.btnReplay;
+  document.getElementById('btnAnimateSpag').textContent = t.btnAnimate;
+  document.getElementById('btnNewCards').textContent = t.btnNewStudent;
+  document.getElementById('btnRevealAll').textContent = t.btnRevealAll;
+
+  // Chart title (default, if no simulation running)
+  if (!anim.running && anim.grades && anim.grades.length < 2) {
+    document.getElementById('chartTitle').textContent = t.chartTitleDefault;
+  }
+
+  // Re-render factor cards (preserving active state)
+  const wasActive = new Set(active);
+  document.getElementById('factorList').innerHTML = '';
+  renderFactorCards();
+  // Re-apply active state to re-rendered cards
+  const cards = document.querySelectorAll('.factor-card');
+  cards.forEach((card, i) => {
+    if (wasActive.has(i)) card.classList.add('active');
+  });
+
+  // Update insight
+  updateInsight();
+}
+
+// ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
 
-renderFactorCards();
-updateInsight();
+applyLang();
 </script>
 </body>
 </html>
