@@ -240,7 +240,7 @@
         <button class="aid-btn primary" id="btnNewBuild" onclick="newBuildStudent()">🎲 New Student</button>
         <button class="aid-btn" id="btnReplayBuild" onclick="replayBuild()">↺ Replay</button>
       </div>
-      <canvas id="buildCanvas" class="aid-canvas" height="130"></canvas>
+      <canvas id="buildCanvas" class="aid-canvas" height="210"></canvas>
     </div>
     <!-- Spaghetti Paths -->
     <div id="aidSpag" style="display:none">
@@ -852,14 +852,21 @@ function showTeachingAid() {
 }
 
 // ── Build-a-Grade ─────────────────────────────────────
+const N_BUILD_STUDENTS = 5;
 let buildSt = null, buildTimer = null;
 
 function newBuildStudent() {
   if (buildTimer) { clearInterval(buildTimer); buildTimer = null; }
   const factors = getActiveFactors();
   if (!factors.length) return;
-  buildSt = { factors, values: factors.map(f => f.sample()), shown: 0 };
-  buildSt.total = (buildSt.values.reduce((a, b) => a + b, 0) / factors.length) * 100;
+  buildSt = {
+    factors,
+    students: Array.from({ length: N_BUILD_STUDENTS }, () => {
+      const values = factors.map(f => f.sample());
+      return { values, total: (values.reduce((a, b) => a + b, 0) / factors.length) * 100 };
+    }),
+    shown: 0
+  };
   animateBuild();
 }
 
@@ -876,7 +883,7 @@ function animateBuild() {
     buildSt.shown++;
     drawBuild();
     if (buildSt.shown >= buildSt.factors.length) { clearInterval(buildTimer); buildTimer = null; }
-  }, 600);
+  }, 1200);
 }
 
 function drawBuild() {
@@ -886,63 +893,71 @@ function drawBuild() {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
   if (!buildSt) return;
-  const { factors, values, shown, total } = buildSt;
+  const { factors, students, shown } = buildSt;
   const n = factors.length;
-  const PAD = 16, BAR_H = 36, BAR_Y = 44, barW = W - PAD * 2;
-
-  // Background track
-  ctx.fillStyle = '#f1f5f9';
-  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(PAD, BAR_Y, barW, BAR_H, 5) : ctx.rect(PAD, BAR_Y, barW, BAR_H);
-  ctx.fill();
-
-  // Revealed segments
-  let cum = 0;
-  for (let i = 0; i < shown; i++) {
-    const w = (values[i] / n) * barW;
-    ctx.fillStyle = factors[i].color + 'cc';
-    ctx.fillRect(PAD + cum * barW, BAR_Y, w, BAR_H);
-    cum += values[i] / n;
-  }
-
-  // Running total marker
-  if (shown > 0) {
-    const markerX = PAD + cum * barW;
-    const runGrade = cum * 100;
-    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.moveTo(markerX, BAR_Y - 6); ctx.lineTo(markerX, BAR_Y + BAR_H + 6); ctx.stroke();
-    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'left';
-    const lx = markerX + 8 > W - 90 ? markerX - 92 : markerX + 8;
-    ctx.fillText(`${runGrade.toFixed(1)} / 100`, lx, BAR_Y + BAR_H / 2 + 5);
-  }
-
-  // Labels below each revealed segment
-  let cum2 = 0;
-  for (let i = 0; i < shown; i++) {
-    const contrib = values[i] / n;
-    const midX = PAD + (cum2 + contrib / 2) * barW;
-    if (contrib * barW > 28) {
-      ctx.fillStyle = factors[i].color; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(tFactor(FACTORS.indexOf(factors[i])).name.split(' ')[0], midX, BAR_Y + BAR_H + 13);
-      ctx.fillText(`+${(contrib * 100).toFixed(1)}`, midX, BAR_Y + BAR_H + 25);
-    }
-    cum2 += contrib;
-  }
-
-  // Dotted placeholders for unrevealed
-  for (let i = shown; i < n; i++) {
-    const w = (values[i] / n) * barW;
-    ctx.strokeStyle = factors[i].color + '55'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
-    ctx.strokeRect(PAD + cum * barW, BAR_Y, w, BAR_H);
-    ctx.setLineDash([]);
-    cum += values[i] / n;
-  }
+  const PAD = 16, LBL_W = 24;
+  const barX = PAD + LBL_W, barW = W - PAD - barX;
+  const BAR_H = 22, BAR_GAP = 7;
+  const TITLE_H = 26;
 
   // Title
   ctx.fillStyle = '#475569'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left';
-  ctx.fillText(tx().buildTitle(shown, n), PAD, 26);
-  if (shown === n) {
-    ctx.fillStyle = '#4361ee'; ctx.textAlign = 'right';
-    ctx.fillText(tx().buildFinal(total.toFixed(1)), W - PAD, 26);
+  ctx.fillText(tx().buildTitle(shown, n), PAD, 18);
+
+  students.forEach((st, si) => {
+    const { values, total } = st;
+    const barY = TITLE_H + si * (BAR_H + BAR_GAP);
+
+    // Student label
+    ctx.fillStyle = '#94a3b8'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'right';
+    ctx.fillText(`S${si + 1}`, barX - 4, barY + BAR_H / 2 + 3);
+
+    // Background track
+    ctx.fillStyle = '#f1f5f9';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(barX, barY, barW, BAR_H, 3) : ctx.rect(barX, barY, barW, BAR_H);
+    ctx.fill();
+
+    // Revealed segments
+    let cum = 0;
+    for (let i = 0; i < shown; i++) {
+      const w = (values[i] / n) * barW;
+      ctx.fillStyle = factors[i].color + 'cc';
+      ctx.fillRect(barX + cum * barW, barY, w, BAR_H);
+      cum += values[i] / n;
+    }
+
+    // Running total marker + grade
+    if (shown > 0) {
+      const markerX = barX + cum * barW;
+      const runGrade = cum * 100;
+      ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(markerX, barY - 3); ctx.lineTo(markerX, barY + BAR_H + 3); ctx.stroke();
+      ctx.fillStyle = shown === n ? '#4361ee' : '#1e293b';
+      ctx.font = `bold 10px system-ui`;
+      const gx = markerX + 5 > W - PAD - 36 ? markerX - 4 : markerX + 4;
+      ctx.textAlign = markerX + 5 > W - PAD - 36 ? 'right' : 'left';
+      ctx.fillText(`${runGrade.toFixed(1)}`, gx, barY + BAR_H / 2 + 3);
+    }
+
+    // Dotted placeholders for unrevealed
+    let cum2 = cum;
+    for (let i = shown; i < n; i++) {
+      const w = (values[i] / n) * barW;
+      ctx.strokeStyle = factors[i].color + '44'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+      ctx.strokeRect(barX + cum2 * barW, barY, w, BAR_H);
+      ctx.setLineDash([]);
+      cum2 += values[i] / n;
+    }
+  });
+
+  // Factor labels at bottom — shared, equal spacing
+  const labY = TITLE_H + N_BUILD_STUDENTS * (BAR_H + BAR_GAP) + 4;
+  for (let i = 0; i < n; i++) {
+    const midX = barX + ((i + 0.5) / n) * barW;
+    ctx.fillStyle = i < shown ? factors[i].color : '#cbd5e1';
+    ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(tFactor(FACTORS.indexOf(factors[i])).name.split(' ')[0], midX, labY + 9);
   }
 }
 
@@ -1037,25 +1052,24 @@ function drawSpag() {
 }
 
 // ── Factor Cards ──────────────────────────────────────
-const N_CARD_STUDENTS = 5;
 let cardSt = null, cardFlipTimer = null, cardFlipIdx = 0;
 
 function newCardDeal() {
   if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
   const factors = getActiveFactors();
   if (!factors.length) return;
+  const values = factors.map(f => f.sample());
   cardSt = {
     factors,
-    students: Array.from({ length: N_CARD_STUDENTS }, () => {
-      const values = factors.map(f => f.sample());
-      return { values, total: (values.reduce((a, b) => a + b, 0) / factors.length) * 100, flipped: new Array(factors.length).fill(false) };
-    })
+    values,
+    total: (values.reduce((a, b) => a + b, 0) / factors.length) * 100,
+    flipped: new Array(factors.length).fill(false)
   };
   cardFlipIdx = 0;
   renderCards();
   cardFlipTimer = setInterval(() => {
     if (cardFlipIdx >= factors.length) { clearInterval(cardFlipTimer); cardFlipTimer = null; return; }
-    cardSt.students.forEach(st => { st.flipped[cardFlipIdx] = true; });
+    cardSt.flipped[cardFlipIdx] = true;
     cardFlipIdx++;
     renderCards();
   }, 550);
@@ -1064,55 +1078,50 @@ function newCardDeal() {
 function flipAllCards() {
   if (!cardSt) return;
   if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
-  cardSt.students.forEach(st => { st.flipped = st.flipped.map(() => true); });
+  cardSt.flipped = cardSt.flipped.map(() => true);
   renderCards();
 }
 
-function flipCard(si, ci) {
-  if (!cardSt || cardSt.students[si].flipped[ci]) return;
+function flipCard(ci) {
+  if (!cardSt || cardSt.flipped[ci]) return;
   if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
-  cardSt.students[si].flipped[ci] = true;
+  cardSt.flipped[ci] = true;
   renderCards();
 }
 
 function renderCards() {
   if (!cardSt) return;
-  const { factors, students } = cardSt;
+  const { factors, values, total, flipped } = cardSt;
   const t = tx();
+  const nF = flipped.filter(Boolean).length;
+  const runGrade = nF > 0 ? (values.slice(0, nF).reduce((a, b) => a + b, 0) / factors.length) * 100 : null;
 
-  document.getElementById('cardDeck').innerHTML = students.map((st, si) => {
-    const nF = st.flipped.filter(Boolean).length;
-    const runGrade = nF > 0 ? (st.values.slice(0, nF).reduce((a, b) => a + b, 0) / factors.length) * 100 : null;
-    const totalText = runGrade === null ? t.cardsDown
-      : nF === factors.length ? t.cardsFinal(st.total.toFixed(1))
-      : t.cardsRunning(runGrade.toFixed(1), nF, factors.length);
-    const totalColor = nF === factors.length ? '#4361ee' : '#2d3a9a';
-
-    const cards = factors.map((f, ci) => {
-      const tf = tFactor(FACTORS.indexOf(f));
-      return `
-        <div class="fc-wrap fc-sm${st.flipped[ci] ? ' flipped' : ''}" onclick="flipCard(${si},${ci})">
-          <div class="fc-inner">
-            <div class="fc-face">?</div>
-            <div class="fc-back" style="border-color:${f.color}">
-              <div class="fc-nm" style="color:${f.color}">${tf.name}</div>
-              <div class="fc-val" style="color:${f.color}">${(st.values[ci]*100).toFixed(0)}<span style="font-size:.5em;font-weight:500">/100</span></div>
-              <div class="fc-bar"><div class="fc-fill" style="width:${st.values[ci]*100}%;background:${f.color}"></div></div>
-              <div class="fc-sh">${tf.shape}</div>
-              <div class="fc-pts">+${((st.values[ci]/factors.length)*100).toFixed(1)}</div>
-            </div>
+  document.getElementById('cardDeck').innerHTML = factors.map((f, ci) => {
+    const tf = tFactor(FACTORS.indexOf(f));
+    return `
+      <div class="fc-wrap${flipped[ci] ? ' flipped' : ''}" onclick="flipCard(${ci})">
+        <div class="fc-inner">
+          <div class="fc-face">?</div>
+          <div class="fc-back" style="border-color:${f.color}">
+            <div class="fc-nm" style="color:${f.color}">${tf.name}</div>
+            <div class="fc-val" style="color:${f.color}">${(values[ci]*100).toFixed(0)}<span style="font-size:.5em;font-weight:500">/100</span></div>
+            <div class="fc-bar"><div class="fc-fill" style="width:${values[ci]*100}%;background:${f.color}"></div></div>
+            <div class="fc-sh">${tf.shape}</div>
+            <div class="fc-pts">+${((values[ci]/factors.length)*100).toFixed(1)}</div>
           </div>
-        </div>`;
-    }).join('');
-
-    return `<div class="student-row">
-      <div class="student-lbl">S${si + 1}</div>
-      <div class="student-cards">${cards}</div>
-      <div class="student-tot" style="color:${totalColor}">${totalText}</div>
-    </div>`;
+        </div>
+      </div>`;
   }).join('');
 
-  document.getElementById('cardTotal').style.display = 'none';
+  const totalEl = document.getElementById('cardTotal');
+  if (runGrade === null) {
+    totalEl.textContent = t.cardsDown;
+  } else if (nF === factors.length) {
+    totalEl.textContent = t.cardsFinal(total.toFixed(1));
+  } else {
+    totalEl.textContent = t.cardsRunning(runGrade.toFixed(1), nF, factors.length);
+  }
+  totalEl.style.display = '';
 }
 
 // ══════════════════════════════════════════════════════
@@ -1213,7 +1222,7 @@ function applyLang() {
   document.getElementById('btnNewBuild').textContent = t.btnNewStudent;
   document.getElementById('btnReplayBuild').textContent = t.btnReplay;
   document.getElementById('btnAnimateSpag').textContent = t.btnAnimate;
-  document.getElementById('btnNewCards').textContent = t.btnNew5Students;
+  document.getElementById('btnNewCards').textContent = t.btnNewStudent;
   document.getElementById('btnRevealAll').textContent = t.btnRevealAll;
 
   // Chart title (default, if no simulation running)
