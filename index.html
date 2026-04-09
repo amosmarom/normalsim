@@ -113,6 +113,17 @@
     .fc-sh  { font-size:.6rem; color:#718096; }
     .fc-pts { font-size:.64rem; color:#718096; }
     .fc-total { text-align:center; padding:.55rem; background:var(--primary-light); border-radius:8px; font-size:.85rem; font-weight:700; color:#2d3a9a; }
+    /* Multi-student rows */
+    .student-row { display:flex; align-items:center; gap:.4rem; margin-bottom:.3rem; }
+    .student-lbl { font-size:.7rem; font-weight:700; color:var(--muted); min-width:1.8rem; text-align:center; flex-shrink:0; }
+    .student-cards { display:flex; gap:.22rem; overflow-x:auto; flex-shrink:0; }
+    .student-tot { font-size:.68rem; font-weight:700; padding-left:.35rem; min-width:7rem; line-height:1.3; }
+    /* Smaller flip cards for 5-student view */
+    .fc-sm .fc-inner { width:76px; height:104px; }
+    .fc-sm .fc-nm { font-size:.55rem; }
+    .fc-sm .fc-val { font-size:1.05rem; }
+    .fc-sm .fc-sh  { font-size:.52rem; }
+    .fc-sm .fc-pts { font-size:.56rem; }
   </style>
 </head>
 <body>
@@ -212,10 +223,9 @@
       </div>
       <canvas id="boxPlotCanvas" height="130"></canvas>
     </div>
-  </div>
 
-  <!-- Teaching Aid -->
-  <div class="card" id="teachingAidCard" style="display:none">
+    <!-- Teaching Aid -->
+    <div class="card" id="teachingAidCard" style="display:none">
     <div class="aid-header">
       <div class="card-title" id="teachingAidTitle" style="margin:0">Teaching Aid — CLT in Action</div>
       <div class="aid-tabs">
@@ -250,6 +260,7 @@
     </div>
   </div>
 
+  </div><!-- end chart-panel -->
 </div>
 
 <script>
@@ -304,6 +315,7 @@ const T = {
     tabSpag: '〰 Spaghetti Paths',
     tabCards: '🃏 Factor Cards',
     btnNewStudent: '🎲 New Student',
+    btnNew5Students: '🎲 5 Students',
     btnReplay: '↺ Replay',
     btnAnimate: '▶ Animate',
     btnRevealAll: '👁 Reveal All',
@@ -330,7 +342,7 @@ const T = {
       { name: 'Sleep Quality',    desc: 'Sleep quality the night before the exam',                        shape: 'Uniform' },
       { name: 'Test Anxiety',     desc: 'Calm students score high; anxious students score low',           shape: 'Bimodal' },
       { name: 'Prior Knowledge',  desc: "Background from prerequisites — either you have it or you don't", shape: 'U-Shaped' },
-      { name: 'Luck Factor',      desc: 'Random events on exam day — familiar questions, good guesses',   shape: 'Triangular' }
+      { name: 'Flat Noise',        desc: 'Pure random noise — equal chance of any value',                  shape: 'Flat/Uniform' }
     ],
     insights: [
       () => 'Select at least one factor to begin.',
@@ -379,6 +391,7 @@ const T = {
     tabSpag: '〰 נתיבי ספגטי',
     tabCards: '🃏 קלפי גורמים',
     btnNewStudent: '🎲 תלמיד חדש',
+    btnNew5Students: '🎲 5 תלמידים',
     btnReplay: '↺ שוב',
     btnAnimate: '▶ הנפש',
     btnRevealAll: '👁 גלה הכל',
@@ -405,7 +418,7 @@ const T = {
       { name: 'איכות שינה',   desc: 'שינה לפני הבחינה',                            shape: 'אחיד' },
       { name: 'חרדת בחינות',  desc: 'תלמידים רגועים מצליחים; חרדים נכשלים',       shape: 'דו-שיאי' },
       { name: 'ידע קודם',     desc: 'רקע מקורסי קדם — יש או אין',                  shape: 'צורת U' },
-      { name: 'גורם מזל',     desc: 'אירועים אקראיים ביום הבחינה',                 shape: 'משולשי' }
+      { name: 'רעש שטוח',     desc: 'רעש אקראי טהור — הסתברות שווה לכל ערך',     shape: 'שטוח/אחיד' }
     ],
     insights: [
       () => 'בחר לפחות גורם אחד כדי להתחיל.',
@@ -468,9 +481,8 @@ const FACTORS = [
       : clamp01(gaussRandom(0.88, 0.08))
   },
   {
-    name: 'Luck Factor', desc: 'Random events on exam day — familiar questions, good guesses',
-    shape: 'Triangular', color: '#d35400',
-    sample: () => { const r = Math.random(), c = 0.6; return r < c ? Math.sqrt(r * c) : 1 - Math.sqrt((1 - r) * (1 - c)); }
+    color: '#64748b',
+    sample: () => Math.random()
   }
 ];
 
@@ -1025,67 +1037,82 @@ function drawSpag() {
 }
 
 // ── Factor Cards ──────────────────────────────────────
+const N_CARD_STUDENTS = 5;
 let cardSt = null, cardFlipTimer = null, cardFlipIdx = 0;
 
 function newCardDeal() {
   if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
   const factors = getActiveFactors();
   if (!factors.length) return;
-  cardSt = { factors, values: factors.map(f => f.sample()), flipped: new Array(factors.length).fill(false) };
-  cardSt.total = (cardSt.values.reduce((a, b) => a + b, 0) / factors.length) * 100;
+  cardSt = {
+    factors,
+    students: Array.from({ length: N_CARD_STUDENTS }, () => {
+      const values = factors.map(f => f.sample());
+      return { values, total: (values.reduce((a, b) => a + b, 0) / factors.length) * 100, flipped: new Array(factors.length).fill(false) };
+    })
+  };
   cardFlipIdx = 0;
   renderCards();
   cardFlipTimer = setInterval(() => {
-    if (cardFlipIdx >= cardSt.factors.length) { clearInterval(cardFlipTimer); cardFlipTimer = null; return; }
-    cardSt.flipped[cardFlipIdx++] = true;
+    if (cardFlipIdx >= factors.length) { clearInterval(cardFlipTimer); cardFlipTimer = null; return; }
+    cardSt.students.forEach(st => { st.flipped[cardFlipIdx] = true; });
+    cardFlipIdx++;
     renderCards();
-  }, 650);
+  }, 550);
 }
 
 function flipAllCards() {
   if (!cardSt) return;
   if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
-  cardSt.flipped = cardSt.flipped.map(() => true);
+  cardSt.students.forEach(st => { st.flipped = st.flipped.map(() => true); });
   renderCards();
 }
 
-function flipCard(i) {
-  if (!cardSt || cardSt.flipped[i]) return;
+function flipCard(si, ci) {
+  if (!cardSt || cardSt.students[si].flipped[ci]) return;
   if (cardFlipTimer) { clearInterval(cardFlipTimer); cardFlipTimer = null; }
-  cardSt.flipped[i] = true;
+  cardSt.students[si].flipped[ci] = true;
   renderCards();
 }
 
 function renderCards() {
   if (!cardSt) return;
-  const { factors, values, flipped } = cardSt;
-  const nF = flipped.filter(Boolean).length;
-  const runGrade = nF > 0 ? (values.slice(0, nF).reduce((a, b) => a + b, 0) / factors.length) * 100 : null;
+  const { factors, students } = cardSt;
+  const t = tx();
 
-  document.getElementById('cardDeck').innerHTML = factors.map((f, i) => {
-    const fi = FACTORS.indexOf(f);
-    const tf = tFactor(fi);
-    return `
-    <div class="fc-wrap${flipped[i] ? ' flipped' : ''}" onclick="flipCard(${i})">
-      <div class="fc-inner">
-        <div class="fc-face">?</div>
-        <div class="fc-back" style="border-color:${f.color}">
-          <div class="fc-nm" style="color:${f.color}">${tf.name}</div>
-          <div class="fc-val" style="color:${f.color}">${(values[i]*100).toFixed(0)}<span style="font-size:.5em;font-weight:500">/100</span></div>
-          <div class="fc-bar"><div class="fc-fill" style="width:${values[i]*100}%;background:${f.color}"></div></div>
-          <div class="fc-sh">${tf.shape}</div>
-          <div class="fc-pts">+${((values[i]/factors.length)*100).toFixed(1)} pts</div>
-        </div>
-      </div>
+  document.getElementById('cardDeck').innerHTML = students.map((st, si) => {
+    const nF = st.flipped.filter(Boolean).length;
+    const runGrade = nF > 0 ? (st.values.slice(0, nF).reduce((a, b) => a + b, 0) / factors.length) * 100 : null;
+    const totalText = runGrade === null ? t.cardsDown
+      : nF === factors.length ? t.cardsFinal(st.total.toFixed(1))
+      : t.cardsRunning(runGrade.toFixed(1), nF, factors.length);
+    const totalColor = nF === factors.length ? '#4361ee' : '#2d3a9a';
+
+    const cards = factors.map((f, ci) => {
+      const tf = tFactor(FACTORS.indexOf(f));
+      return `
+        <div class="fc-wrap fc-sm${st.flipped[ci] ? ' flipped' : ''}" onclick="flipCard(${si},${ci})">
+          <div class="fc-inner">
+            <div class="fc-face">?</div>
+            <div class="fc-back" style="border-color:${f.color}">
+              <div class="fc-nm" style="color:${f.color}">${tf.name}</div>
+              <div class="fc-val" style="color:${f.color}">${(st.values[ci]*100).toFixed(0)}<span style="font-size:.5em;font-weight:500">/100</span></div>
+              <div class="fc-bar"><div class="fc-fill" style="width:${st.values[ci]*100}%;background:${f.color}"></div></div>
+              <div class="fc-sh">${tf.shape}</div>
+              <div class="fc-pts">+${((st.values[ci]/factors.length)*100).toFixed(1)}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `<div class="student-row">
+      <div class="student-lbl">S${si + 1}</div>
+      <div class="student-cards">${cards}</div>
+      <div class="student-tot" style="color:${totalColor}">${totalText}</div>
     </div>`;
   }).join('');
 
-  const el = document.getElementById('cardTotal');
-  const t = tx();
-  el.textContent = runGrade === null ? t.cardsDown
-    : nF === factors.length ? t.cardsFinal(cardSt.total.toFixed(1))
-    : t.cardsRunning(runGrade.toFixed(1), nF, factors.length);
-  el.style.color = nF === factors.length ? '#4361ee' : '#2d3a9a';
+  document.getElementById('cardTotal').style.display = 'none';
 }
 
 // ══════════════════════════════════════════════════════
@@ -1186,7 +1213,7 @@ function applyLang() {
   document.getElementById('btnNewBuild').textContent = t.btnNewStudent;
   document.getElementById('btnReplayBuild').textContent = t.btnReplay;
   document.getElementById('btnAnimateSpag').textContent = t.btnAnimate;
-  document.getElementById('btnNewCards').textContent = t.btnNewStudent;
+  document.getElementById('btnNewCards').textContent = t.btnNew5Students;
   document.getElementById('btnRevealAll').textContent = t.btnRevealAll;
 
   // Chart title (default, if no simulation running)
