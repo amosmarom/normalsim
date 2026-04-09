@@ -230,7 +230,6 @@
       <div class="card-title" id="teachingAidTitle" style="margin:0">Teaching Aid — CLT in Action</div>
       <div class="aid-tabs">
         <button class="aid-tab active" id="aidBuildTab" data-mode="build" onclick="setAid('build')">📊 Build-a-Grade</button>
-        <button class="aid-tab" id="aidSpagTab" data-mode="spag"  onclick="setAid('spag')">〰 Spaghetti Paths</button>
         <button class="aid-tab" id="aidCardsTab" data-mode="cards" onclick="setAid('cards')">🃏 Factor Cards</button>
       </div>
     </div>
@@ -239,15 +238,9 @@
       <div class="aid-ctrl">
         <button class="aid-btn primary" id="btnNewBuild" onclick="newBuildStudent()">🎲 New Student</button>
         <button class="aid-btn" id="btnReplayBuild" onclick="replayBuild()">↺ Replay</button>
+        <button class="aid-btn" id="btnShowDist" onclick="showBuildDist()" style="display:none">📊 Distribution</button>
       </div>
-      <canvas id="buildCanvas" class="aid-canvas" height="210"></canvas>
-    </div>
-    <!-- Spaghetti Paths -->
-    <div id="aidSpag" style="display:none">
-      <div class="aid-ctrl">
-        <button class="aid-btn primary" id="btnAnimateSpag" onclick="startSpaghetti()">▶ Animate</button>
-      </div>
-      <canvas id="spagCanvas" class="aid-canvas" height="300"></canvas>
+      <canvas id="buildCanvas" class="aid-canvas" height="580"></canvas>
     </div>
     <!-- Factor Cards -->
     <div id="aidCards" style="display:none">
@@ -312,20 +305,21 @@ const T = {
     legendOutliers: 'Outliers (±1.5 IQR)',
     teachingAidTitle: 'Teaching Aid — CLT in Action',
     tabBuild: '📊 Build-a-Grade',
-    tabSpag: '〰 Spaghetti Paths',
     tabCards: '🃏 Factor Cards',
     btnNewStudent: '🎲 New Student',
     btnNew5Students: '🎲 5 Students',
     btnReplay: '↺ Replay',
     btnAnimate: '▶ Animate',
+    btnShowDist: '📊 Distribution',
     btnRevealAll: '👁 Reveal All',
     cardsDown: 'Cards face down…',
     cardsRunning: (grade, nF, nTotal) => `Running total: ${grade} / 100  (${nF} of ${nTotal} factors)`,
     cardsFinal: total => `✓ Final Grade: ${total} / 100`,
     buildTitle: (shown, n) => `Building grade — ${shown} of ${n} factor${n > 1 ? 's' : ''} revealed`,
     buildFinal: total => `✓ Final Grade: ${total} / 100`,
-    spagTitle: (step, std) => `After ${step + 1} factor${step > 0 ? 's' : ''} — spread σ = ${std} grade pts`,
-    spagYLabel: 'Running avg. grade',
+    buildDistTitle: 'Grade Distribution — 5 bins',
+    buildDistXLabel: 'Grade range',
+    buildDistYLabel: 'Students',
     progText: (done, total, secs) => `${done} / ${total} students · ${secs}s left`,
     chartTitleGenerating: (done, total) => `Grade Distribution — generating… ${done} / ${total}`,
     chartTitleDone: (n, f) => `Grade Distribution — ${n} students · ${f} factor${f > 1 ? 's' : ''} active`,
@@ -342,7 +336,7 @@ const T = {
       { name: 'Sleep Quality',    desc: 'Sleep quality the night before the exam',                        shape: 'Uniform' },
       { name: 'Test Anxiety',     desc: 'Calm students score high; anxious students score low',           shape: 'Bimodal' },
       { name: 'Prior Knowledge',  desc: "Background from prerequisites — either you have it or you don't", shape: 'U-Shaped' },
-      { name: 'Flat Noise',        desc: 'Pure random noise — equal chance of any value',                  shape: 'Flat/Uniform' }
+      { name: 'Friendly Neighbor', desc: 'Unpredictable factor — could help or hurt equally',              shape: 'Flat/Uniform' }
     ],
     insights: [
       () => 'Select at least one factor to begin.',
@@ -388,20 +382,21 @@ const T = {
     legendOutliers: 'ערכים חריגים (±1.5 IQR)',
     teachingAidTitle: 'עזר הוראה — CLT בפעולה',
     tabBuild: '📊 בנה-ציון',
-    tabSpag: '〰 נתיבי ספגטי',
     tabCards: '🃏 קלפי גורמים',
     btnNewStudent: '🎲 תלמיד חדש',
     btnNew5Students: '🎲 5 תלמידים',
     btnReplay: '↺ שוב',
     btnAnimate: '▶ הנפש',
+    btnShowDist: '📊 התפלגות',
     btnRevealAll: '👁 גלה הכל',
     cardsDown: 'קלפים פונים כלפי מטה…',
     cardsRunning: (grade, nF, nTotal) => `סה"כ רץ: ${grade} / 100  (${nF} מתוך ${nTotal} גורמים)`,
     cardsFinal: total => `✓ ציון סופי: ${total} / 100`,
     buildTitle: (shown, n) => `בניית ציון — ${shown} מתוך ${n} גורמים גולו`,
     buildFinal: total => `✓ ציון סופי: ${total} / 100`,
-    spagTitle: (step, std) => `אחרי ${step + 1} גורמים — פיזור σ = ${std} נקודות`,
-    spagYLabel: 'ממוצע רץ',
+    buildDistTitle: 'התפלגות ציונים — 5 סלים',
+    buildDistXLabel: 'טווח ציונים',
+    buildDistYLabel: 'תלמידים',
     progText: (done, total, secs) => `${done} / ${total} תלמידים · ${secs} שניות`,
     chartTitleGenerating: (done, total) => `התפלגות ציונים — מייצר… ${done} / ${total}`,
     chartTitleDone: (n, f) => `התפלגות ציונים — ${n} תלמידים · ${f} גורמים פעילים`,
@@ -418,7 +413,7 @@ const T = {
       { name: 'איכות שינה',   desc: 'שינה לפני הבחינה',                            shape: 'אחיד' },
       { name: 'חרדת בחינות',  desc: 'תלמידים רגועים מצליחים; חרדים נכשלים',       shape: 'דו-שיאי' },
       { name: 'ידע קודם',     desc: 'רקע מקורסי קדם — יש או אין',                  shape: 'צורת U' },
-      { name: 'רעש שטוח',     desc: 'רעש אקראי טהור — הסתברות שווה לכל ערך',     shape: 'שטוח/אחיד' }
+      { name: 'שכן טוב',       desc: 'גורם בלתי צפוי — יכול לעזור או להזיק במידה שווה', shape: 'שטוח/אחיד' }
     ],
     insights: [
       () => 'בחר לפחות גורם אחד כדי להתחיל.',
@@ -833,11 +828,9 @@ function setAid(mode) {
   aidMode = mode;
   document.querySelectorAll('.aid-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
   document.getElementById('aidBuild').style.display = mode === 'build' ? '' : 'none';
-  document.getElementById('aidSpag').style.display  = mode === 'spag'  ? '' : 'none';
   document.getElementById('aidCards').style.display = mode === 'cards' ? '' : 'none';
   setTimeout(() => {
     if (mode === 'build') newBuildStudent();
-    if (mode === 'spag')  startSpaghetti();
     if (mode === 'cards') newCardDeal();
   }, 50);
 }
@@ -846,13 +839,12 @@ function showTeachingAid() {
   document.getElementById('teachingAidCard').style.display = 'block';
   setTimeout(() => {
     if (aidMode === 'build') newBuildStudent();
-    if (aidMode === 'spag')  startSpaghetti();
     if (aidMode === 'cards') newCardDeal();
   }, 100);
 }
 
 // ── Build-a-Grade ─────────────────────────────────────
-const N_BUILD_STUDENTS = 5;
+const N_BUILD_STUDENTS = 30;
 let buildSt = null, buildTimer = null;
 
 function newBuildStudent() {
@@ -865,14 +857,18 @@ function newBuildStudent() {
       const values = factors.map(f => f.sample());
       return { values, total: (values.reduce((a, b) => a + b, 0) / factors.length) * 100 };
     }),
-    shown: 0
+    shown: 0,
+    done: false
   };
+  document.getElementById('btnShowDist').style.display = 'none';
   animateBuild();
 }
 
 function replayBuild() {
   if (!buildSt) { newBuildStudent(); return; }
   if (buildTimer) { clearInterval(buildTimer); buildTimer = null; }
+  buildSt.done = false;
+  document.getElementById('btnShowDist').style.display = 'none';
   animateBuild();
 }
 
@@ -882,7 +878,11 @@ function animateBuild() {
   buildTimer = setInterval(() => {
     buildSt.shown++;
     drawBuild();
-    if (buildSt.shown >= buildSt.factors.length) { clearInterval(buildTimer); buildTimer = null; }
+    if (buildSt.shown >= buildSt.factors.length) {
+      clearInterval(buildTimer); buildTimer = null;
+      buildSt.done = true;
+      document.getElementById('btnShowDist').style.display = '';
+    }
   }, 1200);
 }
 
@@ -897,7 +897,7 @@ function drawBuild() {
   const n = factors.length;
   const PAD = 16, LBL_W = 24;
   const barX = PAD + LBL_W, barW = W - PAD - barX;
-  const BAR_H = 22, BAR_GAP = 7;
+  const BAR_H = 14, BAR_GAP = 3;
   const TITLE_H = 26;
 
   // Title
@@ -961,93 +961,68 @@ function drawBuild() {
   }
 }
 
-// ── Spaghetti Paths ──────────────────────────────────
-let spagPaths = [], spagStep = 0, spagTimer = null;
 
-function startSpaghetti() {
-  if (spagTimer) { clearInterval(spagTimer); spagTimer = null; }
-  const factors = getActiveFactors();
-  if (!factors.length) return;
-  spagPaths = [];
-  for (let i = 0; i < 100; i++) {
-    const pts = [];
-    let sum = 0;
-    for (let k = 0; k < factors.length; k++) {
-      sum += factors[k].sample();
-      pts.push((sum / (k + 1)) * 100); // running mean × 100
-    }
-    spagPaths.push(pts);
-  }
-  spagStep = 0;
-  drawSpag();
-  if (factors.length <= 1) return;
-  spagTimer = setInterval(() => {
-    spagStep++;
-    drawSpag();
-    if (spagStep >= factors.length - 1) { clearInterval(spagTimer); spagTimer = null; }
-  }, 700);
-}
-
-function drawSpag() {
-  const canvas = document.getElementById('spagCanvas');
+function showBuildDist() {
+  if (!buildSt || !buildSt.done) return;
+  const canvas = document.getElementById('buildCanvas');
   canvas.width = canvas.offsetWidth || 700;
   const W = canvas.width, H = canvas.height;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
-  if (!spagPaths.length) return;
-  const factors = getActiveFactors();
-  const n = factors.length;
-  const PL = 44, PR = 16, PT = 30, PB = 46;
-  const pW = W - PL - PR, pH = H - PT - PB;
-  const toX = k => n <= 1 ? PL + pW / 2 : PL + (k / (n - 1)) * pW;
-  const toY = v => PT + (1 - v / 100) * pH;
 
-  // Grid
-  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
-  [0, 25, 50, 75, 100].forEach(v => {
-    const y = toY(v);
-    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(W - PR, y); ctx.stroke();
+  const totals = buildSt.students.map(s => s.total);
+  const BINS = 5, BIN_SIZE = 100 / BINS;
+  const counts = Array(BINS).fill(0);
+  totals.forEach(g => { const bi = Math.min(Math.floor(g / BIN_SIZE), BINS - 1); counts[bi]++; });
+  const maxCount = Math.max(...counts);
+
+  const BIN_COLORS = ['#e53e3e', '#dd6b20', '#d69e2e', '#38a169', '#3182ce'];
+  const PAD_L = 40, PAD_R = 16, PAD_T = 36, PAD_B = 52;
+  const pW = W - PAD_L - PAD_R, pH = H - PAD_T - PAD_B;
+  const bW = pW / BINS;
+
+  const t = tx();
+  // Title
+  ctx.fillStyle = '#475569'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left';
+  ctx.fillText(t.buildDistTitle, PAD_L, 22);
+
+  // Y grid lines
+  for (let y = 0; y <= maxCount; y++) {
+    const yy = PAD_T + pH - (y / maxCount) * pH;
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, yy); ctx.lineTo(W - PAD_R, yy); ctx.stroke();
     ctx.fillStyle = '#a0aec0'; ctx.font = '10px system-ui'; ctx.textAlign = 'right';
-    ctx.fillText(v, PL - 5, y + 3);
-  });
-
-  // X ticks
-  for (let k = 0; k < n; k++) {
-    const x = toX(k);
-    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x, PT + pH); ctx.lineTo(x, PT + pH + 5); ctx.stroke();
-    ctx.fillStyle = factors[k].color; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText(tFactor(FACTORS.indexOf(factors[k])).name.split(' ')[0], x, PT + pH + 18);
+    ctx.fillText(y, PAD_L - 5, yy + 3);
   }
 
-  // Paths
-  spagPaths.forEach(pts => {
-    const g = pts[pts.length - 1];
-    const col = g >= 75 ? '#27ae60' : g >= 55 ? '#4361ee' : g >= 35 ? '#9b59b6' : '#e74c3c';
-    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.globalAlpha = 0.22;
-    ctx.beginPath(); ctx.moveTo(toX(0), toY(pts[0]));
-    for (let k = 1; k <= spagStep && k < pts.length; k++) ctx.lineTo(toX(k), toY(pts[k]));
-    ctx.stroke();
+  // Bars
+  counts.forEach((c, bi) => {
+    const x = PAD_L + bi * bW + 4;
+    const bh = maxCount > 0 ? (c / maxCount) * pH : 0;
+    const y = PAD_T + pH - bh;
+    ctx.fillStyle = BIN_COLORS[bi] + 'cc';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, bW - 8, bh, 4) : ctx.rect(x, y, bW - 8, bh);
+    ctx.fill();
+    // Count label on bar
+    if (c > 0) {
+      ctx.fillStyle = '#1e293b'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(c, x + (bW - 8) / 2, y - 6);
+    }
+    // Bin range label
+    const lo = Math.round(bi * BIN_SIZE), hi = Math.round((bi + 1) * BIN_SIZE);
+    ctx.fillStyle = '#718096'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(`${lo}–${hi}`, x + (bW - 8) / 2, PAD_T + pH + 16);
   });
-  ctx.globalAlpha = 1;
 
-  // Spread annotation (±1σ bracket at current column)
-  const vals = spagPaths.map(p => p[Math.min(spagStep, p.length - 1)]);
-  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
-  const std = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length);
-  const cx = toX(spagStep);
-  ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2.5; ctx.setLineDash([4, 3]);
-  ctx.beginPath(); ctx.moveTo(cx, toY(mean - std)); ctx.lineTo(cx, toY(mean + std)); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Title
-  ctx.fillStyle = '#1e293b'; ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'left';
-  ctx.fillText(tx().spagTitle(spagStep, std.toFixed(1)), PL, 18);
-
-  // Y label
-  ctx.save(); ctx.translate(11, PT + pH / 2); ctx.rotate(-Math.PI / 2);
+  // X axis label
   ctx.fillStyle = '#718096'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
-  ctx.fillText(tx().spagYLabel, 0, 0);
+  ctx.fillText(t.buildDistXLabel, PAD_L + pW / 2, PAD_T + pH + 34);
+
+  // Y axis label
+  ctx.save(); ctx.translate(12, PAD_T + pH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#718096'; ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+  ctx.fillText(t.buildDistYLabel, 0, 0);
   ctx.restore();
 }
 
@@ -1217,11 +1192,10 @@ function applyLang() {
   // Teaching Aid
   document.getElementById('teachingAidTitle').textContent = t.teachingAidTitle;
   document.getElementById('aidBuildTab').textContent = t.tabBuild;
-  document.getElementById('aidSpagTab').textContent = t.tabSpag;
   document.getElementById('aidCardsTab').textContent = t.tabCards;
   document.getElementById('btnNewBuild').textContent = t.btnNewStudent;
   document.getElementById('btnReplayBuild').textContent = t.btnReplay;
-  document.getElementById('btnAnimateSpag').textContent = t.btnAnimate;
+  document.getElementById('btnShowDist').textContent = t.btnShowDist;
   document.getElementById('btnNewCards').textContent = t.btnNewStudent;
   document.getElementById('btnRevealAll').textContent = t.btnRevealAll;
 
